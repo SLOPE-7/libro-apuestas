@@ -1,0 +1,9 @@
+{
+  "name": "Libro de apuestas",
+  "short_name": "Libro",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E4E2DA",
+  "theme_color": "#22282C",
+  "icons": []
+}
