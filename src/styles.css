@@ -166,3 +166,52 @@ button.mini{
   text-underline-offset:3px;
 }
 button.mini:hover{color:var(--ink)}
+
+/* ─────────────────────────────────────────────────────────────
+   PEGA ESTO AL FINAL de src/styles.css
+   (si ya pegaste una versión anterior, reemplázala por esta)
+   ───────────────────────────────────────────────────────────── */
+
+.tipos{
+  display:flex;gap:1px;background:var(--rule-hard);
+  border:1px solid var(--rule-hard);margin-bottom:16px;
+}
+.tipo{
+  flex:1;padding:11px 8px;background:var(--card);border:0;cursor:pointer;
+  color:var(--ink-soft);
+  font:600 12px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.1em;text-transform:uppercase;
+}
+.tipo.on{background:var(--ink);color:var(--paper-2)}
+.tipo:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
+
+/* bloque de mercado dentro de una selección */
+.merc{
+  border-top:1px solid var(--rule);
+  padding-top:10px;margin-top:10px;
+}
+.merc:first-of-type{border-top:0;padding-top:0;margin-top:11px}
+.merc-top{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:5px;min-height:18px;
+}
+
+/* atajos de selección */
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{
+  background:none;border:1px solid var(--rule-hard);
+  padding:6px 10px;cursor:pointer;color:var(--ink-soft);
+  font:500 12px/1 "IBM Plex Mono",monospace;
+}
+.chip.on{background:var(--ink);color:var(--paper-2);border-color:var(--ink)}
+.chip:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+
+button.mini{
+  background:none;border:0;padding:8px 0 0;cursor:pointer;color:var(--ink-soft);
+  font:500 11.5px/1 "IBM Plex Sans Condensed",sans-serif;letter-spacing:.04em;
+  text-decoration:underline;text-underline-offset:3px;
+}
+button.mini:hover{color:var(--ink)}
+
+
+
