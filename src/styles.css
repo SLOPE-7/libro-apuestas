@@ -476,4 +476,22 @@ button.mini:hover{color:var(--ink)}
 
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}
+  
 }
+
+/* Tonos de estado con más presencia */
+:root{
+  --loss:          #A82F17;
+  --loss-soft:     #F6D9D2;
+  --loss-fondo:    #F6D9D2;
+  --gain:          #17654F;
+  --gain-soft:     #D5E7DE;
+  --gain-fondo:    #D5E7DE;
+  --caution:       #9A6206;
+  --caution-soft:  #FAECC4;
+  --caution-fondo: #FAECC4;
+  --cerrada:       #14568C;
+  --cerrada-soft:  #D8E6F5;
+  --cerrada-fondo: #D8E6F5;
+}
+.bet{border-left-width:6px}
