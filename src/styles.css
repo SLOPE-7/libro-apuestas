@@ -26,6 +26,9 @@
   --caution:    #8A5D14;
   --caution-soft:#F2E9D6;
 
+  --cerrada:    #1F4E79;
+  --cerrada-soft:#DCE6F0;
+
   --r: 2px;                       /* esquinas casi rectas: es un libro, no una app de moda */
   --sh: 0 1px 2px rgba(28,34,38,.06), 0 0 0 1px var(--rule);
   --sh-2: 0 2px 6px rgba(28,34,38,.07), 0 0 0 1px var(--rule);
@@ -361,11 +364,12 @@ button.mini:hover{color:var(--ink)}
   background:var(--card);
   box-shadow:var(--sh);border-radius:var(--r);
   border-left:3px solid var(--rule-hard);
-  padding:15px;margin-bottom:12px;
+  padding:0;margin-bottom:12px;overflow:hidden;
 }
 .bet.ganada{border-left-color:var(--gain)}
 .bet.perdida{border-left-color:var(--loss)}
 .bet.pendiente{border-left-color:var(--caution)}
+.bet.cerrada{border-left-color:var(--cerrada)}
 
 .bet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .bet-meta{
@@ -380,6 +384,7 @@ button.mini:hover{color:var(--ink)}
 .badge.ganada{background:var(--gain-soft);color:var(--gain)}
 .badge.perdida{background:var(--loss-soft);color:var(--loss)}
 .badge.pendiente{background:var(--caution-soft);color:var(--caution)}
+.badge.cerrada{background:var(--cerrada-soft);color:var(--cerrada)}
 
 .bet-amt{
   font-family:"IBM Plex Mono",monospace;
@@ -407,7 +412,10 @@ button.mini:hover{color:var(--ink)}
   color:var(--ink-2);font-variant-numeric:tabular-nums;flex-shrink:0;
 }
 .marks{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap}
-.bet-pie{margin-top:13px;padding-top:12px;border-top:1px solid var(--rule)}
+.bet-pie{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin-top:13px;padding-top:12px;border-top:1px solid var(--rule);
+}
 
 /* ── avisos ─────────────────────────────────────────────────── */
 .verdict{
@@ -439,6 +447,69 @@ button.mini:hover{color:var(--ink)}
   font:500 13.5px "IBM Plex Sans Condensed",sans-serif;
   box-shadow:0 4px 14px rgba(28,34,38,.22);z-index:60;
 }
+
+/* ── sugerencias propias y formulario extra ─────────────────── */
+.auto{position:relative}
+.auto-lista{
+  position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:40;
+  list-style:none;margin:0;padding:4px;
+  background:#fff;border:1px solid var(--rule-2);border-radius:var(--r);
+  box-shadow:0 6px 18px rgba(28,34,38,.14);
+  max-height:220px;overflow-y:auto;
+}
+.auto-lista li{margin:0}
+.auto-lista button{
+  display:block;width:100%;text-align:left;background:none;border:0;cursor:pointer;
+  padding:9px 10px;border-radius:var(--r);
+  font:400 14.5px/1.3 "IBM Plex Sans Condensed",sans-serif;color:var(--ink);
+}
+.auto-lista button:hover,.auto-lista button:focus-visible{background:var(--card-2);outline:0}
+
+textarea{
+  width:100%;padding:11px 12px;border:1px solid var(--rule-2);border-radius:var(--r);
+  background:#fff;color:var(--ink);resize:vertical;
+  font:400 13.5px/1.5 "IBM Plex Mono",monospace;
+  transition:border-color .15s,box-shadow .15s;
+}
+textarea::placeholder{color:var(--ink-faint)}
+textarea:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 3px rgba(28,34,38,.08)}
+.card.pegar{border-left:3px solid var(--ink)}
+.card.pegar .row.c2{margin-bottom:0}
+
+/* ── historial plegable ─────────────────────────────────────── */
+.bet-cabecera{
+  display:flex;width:100%;gap:12px;align-items:flex-start;justify-content:space-between;
+  background:none;border:0;cursor:pointer;text-align:left;
+  padding:15px;font-family:inherit;color:inherit;
+  transition:background .12s;
+}
+.bet-cabecera:hover{background:var(--card-2)}
+.bet-cabecera:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
+.bet-izq{min-width:0;flex:1}
+.bet-der{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.chevron{
+  font-family:"IBM Plex Mono",monospace;font-size:17px;
+  color:var(--ink-faint);width:14px;text-align:center;line-height:1;
+}
+
+.bet-cuerpo{padding:0 15px 15px;border-top:1px solid var(--rule)}
+.bet-cuerpo .sel:first-of-type{margin-top:0;border-top:0;padding-top:13px}
+
+/* ── cierre anticipado ──────────────────────────────────────── */
+.cierre{
+  background:var(--cerrada-soft);border-radius:var(--r);
+  padding:14px;margin-top:14px;
+}
+.cierre .ayuda{color:var(--ink-2)}
+.cierre .row.c2{margin-bottom:0}
+
+.cierre-info{
+  background:var(--cerrada-soft);color:var(--cerrada);
+  border-radius:var(--r);padding:11px 13px;margin-top:14px;
+  font-size:13px;line-height:1.5;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+}
+.cierre-info .mini{padding:0;color:var(--cerrada)}
 
 @media (max-width:400px){
   .enfrenta{grid-template-columns:1fr;gap:6px}
