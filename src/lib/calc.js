@@ -9,6 +9,18 @@ export function cuotaApuesta(apuesta) {
   return manual > 1 ? manual : cuotaTotal(apuesta?.selecciones || [])
 }
 
+/**
+ * Estado del boleto entero.
+ *   cerrada   -> se cobró antes de tiempo (cash out)
+ *   perdida   -> alguna selección falló
+ *   ganada    -> todas resueltas y ninguna falló
+ *   pendiente -> queda algo por decidir
+ */
+export function estadoApuesta(a) {
+  if (a && a.cash_out !== null && a.cash_out !== undefined && a.cash_out !== '') return 'cerrada'
+  return estado(a?.selecciones || [])
+}
+
 /** Una perdida -> perdida. Todas resueltas -> resuelta. Resto -> pendiente. */
 export function estado(sel = []) {
   if (!sel.length) return 'pendiente'
@@ -38,9 +50,13 @@ export function multiplicador(s) {
 
 export function resultado(apuesta) {
   const sel = apuesta.selecciones || []
-  if (estado(sel) === 'pendiente') return 0
-
   const stake = Number(apuesta.stake) || 0
+
+  // cierre anticipado: manda lo que devolvió la casa
+  if (apuesta.cash_out !== null && apuesta.cash_out !== undefined && apuesta.cash_out !== '')
+    return Number(apuesta.cash_out) - stake
+
+  if (estado(sel) === 'pendiente') return 0
   const producto = sel.reduce((a, s) => a * multiplicador(s), 1)
   if (producto === 0) return -stake
 
@@ -51,6 +67,22 @@ export function resultado(apuesta) {
     : 1
 
   return stake * (producto * ajuste - 1)
+}
+
+/**
+ * Valor razonable de un cierre anticipado.
+ * Si las patas que faltan estuvieran a precio justo, la apuesta vale hoy
+ * lo apostado multiplicado por las cuotas ya acertadas. La casa siempre
+ * ofrecerá algo menos: ahí está su margen.
+ */
+export function valorCierre(apuesta) {
+  const stake = Number(apuesta.stake) || 0
+  const sel = apuesta.selecciones || []
+  const resueltas = sel.filter(s => s.estado && s.estado !== 'pendiente')
+  if (!resueltas.length) return stake
+  if (resueltas.some(s => multiplicador(s) === 0)) return 0
+  const gana = resueltas.reduce((a, s) => a * multiplicador(s), 1)
+  return Math.round(stake * gana * 100) / 100
 }
 
 export const probImplicita = cuota => (cuota > 1 ? 1 / cuota : 0)
@@ -102,7 +134,7 @@ export const clv = (tomada, cierre) =>
   tomada > 1 && cierre > 1 ? tomada / cierre - 1 : null
 
 export function resumen(apuestas = [], casas = []) {
-  const conEstado = apuestas.map(a => ({ ...a, _e: estado(a.selecciones), _r: resultado(a) }))
+  const conEstado = apuestas.map(a => ({ ...a, _e: estadoApuesta(a), _r: resultado(a) }))
   const resueltas = conEstado.filter(a => a._e !== 'pendiente')
   const ganadas = resueltas.filter(a => a._r > 0)
   const apostado = resueltas.reduce((s, a) => s + Number(a.stake), 0)
