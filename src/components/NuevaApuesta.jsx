@@ -119,7 +119,13 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
     setTipo(r.legs.length > 1 ? 'combinada' : 'simple')
     setPegando(false)
     setCupon('')
-    toast(`${r.legs.length} ${r.legs.length === 1 ? 'selección leída' : 'selecciones leídas'} — revísalas`)
+
+    const sinCuotaLeidas = r.legs.filter(l => l.cuota == null).length
+    const deducidas = r.legs.filter(l => l.deducida).length
+    let msg = `${r.legs.length} ${r.legs.length === 1 ? 'selección leída' : 'selecciones leídas'}`
+    if (sinCuotaLeidas) msg += ` · ${sinCuotaLeidas} sin cuota`
+    if (deducidas) msg += ` · ${deducidas} cuota deducida del total`
+    toast(msg + ' — revísalas')
   }
 
   const nombre = l => [l.local.trim(), l.visitante.trim()].filter(Boolean).join(' vs ')
@@ -212,8 +218,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
           </div>
           <p className="ayuda">
             En la casa, abre el cupón, selecciona el texto y cópialo. No sirve una captura
-            de pantalla: tiene que ser el texto. Después de importar, <strong>revisa cada
-            línea</strong> antes de guardar.
+            de pantalla: tiene que ser el texto. Al copiar desde el móvil las tablas se
+            rompen y algún número puede perderse, así que <strong>revisa cada línea</strong>
+            antes de guardar.
           </p>
           <div className="row c2" style={{ marginTop: 12 }}>
             <button className="act" onClick={importar}>Leer cupón</button>
