@@ -26,8 +26,12 @@
   --caution:    #8A5D14;
   --caution-soft:#F2E9D6;
 
-  --cerrada:    #1F4E79;
-  --cerrada-soft:#DCE6F0;
+  --cerrada:      #1F4E79;[span_0](start_span)[span_0](end_span)
+  --cerrada-soft: #DCE6F0;[span_1](start_span)[span_1](end_span)
+  --cerrada-fondo:#E7EEF6;[span_2](start_span)[span_2](end_span)
+  --gain-fondo:   #E4EDE9;[span_3](start_span)[span_3](end_span)
+  --loss-fondo:   #F4E4E0;[span_4](start_span)[span_4](end_span)
+  --caution-fondo:#F5EDDC;[span_5](start_span)[span_5](end_span)
 
   --r: 2px;                       /* esquinas casi rectas: es un libro, no una app de moda */
   --sh: 0 1px 2px rgba(28,34,38,.06), 0 0 0 1px var(--rule);
@@ -363,13 +367,14 @@ button.mini:hover{color:var(--ink)}
 .bet{
   background:var(--card);
   box-shadow:var(--sh);border-radius:var(--r);
-  border-left:3px solid var(--rule-hard);
-  padding:0;margin-bottom:12px;overflow:hidden;
+  padding:0;margin-bottom:12px;overflow:hidden;border-left-width:4px;[span_6](start_span)[span_6](end_span)
 }
-.bet.ganada{border-left-color:var(--gain)}
-.bet.perdida{border-left-color:var(--loss)}
-.bet.pendiente{border-left-color:var(--caution)}
-.bet.cerrada{border-left-color:var(--cerrada)}
+
+/* el bloque entero toma el color del estado */
+.bet.pendiente{background:var(--caution-fondo);border-left-color:var(--caution)}[span_7](start_span)[span_7](end_span)
+.bet.ganada   {background:var(--gain-fondo);   border-left-color:var(--gain)}[span_8](start_span)[span_8](end_span)
+.bet.perdida  {background:var(--loss-fondo);   border-left-color:var(--loss)}[span_9](start_span)[span_9](end_span)
+.bet.cerrada  {background:var(--cerrada-fondo);border-left-color:var(--cerrada)}[span_10](start_span)[span_10](end_span)
 
 .bet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .bet-meta{
@@ -378,13 +383,15 @@ button.mini:hover{color:var(--ink)}
   letter-spacing:.05em;color:var(--ink-soft);text-transform:uppercase;
 }
 .sep{color:var(--ink-faint)}
+
+/* la etiqueta ya no necesita fondo: el bloque entero lleva el color */
 .badge{
-  padding:2px 7px;border-radius:var(--r);font-size:9.5px;letter-spacing:.1em;
+  background:none;padding:0;font-weight:600;font-size:9.5px;letter-spacing:.1em;[span_11](start_span)[span_11](end_span)
 }
-.badge.ganada{background:var(--gain-soft);color:var(--gain)}
-.badge.perdida{background:var(--loss-soft);color:var(--loss)}
-.badge.pendiente{background:var(--caution-soft);color:var(--caution)}
-.badge.cerrada{background:var(--cerrada-soft);color:var(--cerrada)}
+.badge.ganada{color:var(--gain)}[span_12](start_span)[span_12](end_span)
+.badge.perdida{color:var(--loss)}[span_13](start_span)[span_13](end_span)
+.badge.pendiente{color:var(--caution)}[span_14](start_span)[span_14](end_span)
+.badge.cerrada{color:var(--cerrada)}[span_15](start_span)[span_15](end_span)
 
 .bet-amt{
   font-family:"IBM Plex Mono",monospace;
@@ -412,10 +419,6 @@ button.mini:hover{color:var(--ink)}
   color:var(--ink-2);font-variant-numeric:tabular-nums;flex-shrink:0;
 }
 .marks{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap}
-.bet-pie{
-  display:flex;gap:8px;flex-wrap:wrap;
-  margin-top:13px;padding-top:12px;border-top:1px solid var(--rule);
-}
 
 /* ── avisos ─────────────────────────────────────────────────── */
 .verdict{
@@ -449,67 +452,77 @@ button.mini:hover{color:var(--ink)}
 }
 
 /* ── sugerencias propias y formulario extra ─────────────────── */
-.auto{position:relative}
+.auto{position:relative}[span_16](start_span)[span_16](end_span)
 .auto-lista{
   position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:40;
   list-style:none;margin:0;padding:4px;
   background:#fff;border:1px solid var(--rule-2);border-radius:var(--r);
   box-shadow:0 6px 18px rgba(28,34,38,.14);
   max-height:220px;overflow-y:auto;
-}
-.auto-lista li{margin:0}
+}[span_17](start_span)[span_17](end_span)
+.auto-lista li{margin:0}[span_18](start_span)[span_18](end_span)
 .auto-lista button{
   display:block;width:100%;text-align:left;background:none;border:0;cursor:pointer;
   padding:9px 10px;border-radius:var(--r);
   font:400 14.5px/1.3 "IBM Plex Sans Condensed",sans-serif;color:var(--ink);
-}
-.auto-lista button:hover,.auto-lista button:focus-visible{background:var(--card-2);outline:0}
+}[span_19](start_span)[span_19](end_span)
+.auto-lista button:hover,.auto-lista button:focus-visible{background:var(--card-2);outline:0}[span_20](start_span)[span_20](end_span)
 
 textarea{
   width:100%;padding:11px 12px;border:1px solid var(--rule-2);border-radius:var(--r);
   background:#fff;color:var(--ink);resize:vertical;
   font:400 13.5px/1.5 "IBM Plex Mono",monospace;
   transition:border-color .15s,box-shadow .15s;
-}
-textarea::placeholder{color:var(--ink-faint)}
-textarea:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 3px rgba(28,34,38,.08)}
-.card.pegar{border-left:3px solid var(--ink)}
-.card.pegar .row.c2{margin-bottom:0}
+}[span_21](start_span)[span_21](end_span)
+textarea::placeholder{color:var(--ink-faint)}[span_22](start_span)[span_22](end_span)
+textarea:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 3px rgba(28,34,38,.08)}[span_23](start_span)[span_23](end_span)
+.card.pegar{border-left:3px solid var(--ink)}[span_24](start_span)[span_24](end_span)
+.card.pegar .row.c2{margin-bottom:0}[span_25](start_span)[span_25](end_span)
 
 /* ── historial plegable ─────────────────────────────────────── */
 .bet-cabecera{
   display:flex;width:100%;gap:12px;align-items:flex-start;justify-content:space-between;
   background:none;border:0;cursor:pointer;text-align:left;
   padding:15px;font-family:inherit;color:inherit;
-  transition:background .12s;
-}
-.bet-cabecera:hover{background:var(--card-2)}
-.bet-cabecera:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
-.bet-izq{min-width:0;flex:1}
-.bet-der{display:flex;align-items:center;gap:10px;flex-shrink:0}
+  transition:filter .12s;
+}[span_26](start_span)[span_26](end_span)
+.bet-cabecera:hover{filter:brightness(.97)}[span_27](start_span)[span_27](end_span)
+.bet-cabecera:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}[span_28](start_span)[span_28](end_span)
+.bet-izq{min-width:0;flex:1}[span_29](start_span)[span_29](end_span)
+.bet-der{display:flex;align-items:center;gap:10px;flex-shrink:0}[span_30](start_span)[span_30](end_span)
 .chevron{
   font-family:"IBM Plex Mono",monospace;font-size:17px;
   color:var(--ink-faint);width:14px;text-align:center;line-height:1;
-}
+}[span_31](start_span)[span_31](end_span)
 
-.bet-cuerpo{padding:0 15px 15px;border-top:1px solid var(--rule)}
-.bet-cuerpo .sel:first-of-type{margin-top:0;border-top:0;padding-top:13px}
+/* el cuerpo desplegado se aclara para que se lea cómodo */
+.bet-cuerpo{
+  background:var(--card);
+  padding:0 15px 15px;
+  border-top:1px solid rgba(28,34,38,.10);
+}[span_32](start_span)[span_32](end_span)
+.bet-cuerpo .sel:first-of-type{margin-top:0;border-top:0;padding-top:13px}[span_33](start_span)[span_33](end_span)
+
+.bet-pie{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin-top:13px;padding-top:12px;border-top:1px solid var(--rule);
+}[span_34](start_span)[span_34](end_span)
 
 /* ── cierre anticipado ──────────────────────────────────────── */
 .cierre{
   background:var(--cerrada-soft);border-radius:var(--r);
   padding:14px;margin-top:14px;
-}
-.cierre .ayuda{color:var(--ink-2)}
-.cierre .row.c2{margin-bottom:0}
+}[span_35](start_span)[span_35](end_span)
+.cierre .ayuda{color:var(--ink-2)}[span_36](start_span)[span_36](end_span)
+.cierre .row.c2{margin-bottom:0}[span_37](start_span)[span_37](end_span)
 
 .cierre-info{
   background:var(--cerrada-soft);color:var(--cerrada);
   border-radius:var(--r);padding:11px 13px;margin-top:14px;
   font-size:13px;line-height:1.5;
   display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
-}
-.cierre-info .mini{padding:0;color:var(--cerrada)}
+}[span_38](start_span)[span_38](end_span)
+.cierre-info .mini{padding:0;color:var(--cerrada)}[span_39](start_span)[span_39](end_span)
 
 @media (max-width:400px){
   .enfrenta{grid-template-columns:1fr;gap:6px}
