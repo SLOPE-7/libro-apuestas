@@ -3,20 +3,54 @@
 export const cuotaTotal = (sel = []) =>
   sel.reduce((a, s) => a * (Number(s.cuota) || 1), 1)
 
-/** Una perdida -> perdida. Todas ganadas -> ganada. Resto -> pendiente. */
+/** Cuota real del boleto: la de la casa si está anotada, si no el producto. */
+export function cuotaApuesta(apuesta) {
+  const manual = Number(apuesta?.cuota_total)
+  return manual > 1 ? manual : cuotaTotal(apuesta?.selecciones || [])
+}
+
+/** Una perdida -> perdida. Todas resueltas -> resuelta. Resto -> pendiente. */
 export function estado(sel = []) {
   if (!sel.length) return 'pendiente'
-  if (sel.some(s => s.estado === 'perdida')) return 'perdida'
-  if (sel.every(s => s.estado === 'ganada')) return 'ganada'
-  return 'pendiente'
+  if (sel.some(s => s.estado === 'pendiente' || !s.estado)) return 'pendiente'
+  return sel.some(s => multiplicador(s) === 0) ? 'perdida' : 'ganada'
+}
+
+/**
+ * Lo que aporta cada selección al boleto.
+ *   ganada        -> su cuota
+ *   perdida       -> 0, tumba el boleto entero
+ *   anulada       -> 1, ni suma ni resta
+ *   media ganada  -> (cuota+1)/2   media apuesta cobra, media se devuelve
+ *   media perdida -> 0.5           media se pierde, media se devuelve
+ */
+export function multiplicador(s) {
+  const c = Number(s.cuota) || 1
+  switch (s.estado) {
+    case 'ganada':        return c
+    case 'perdida':       return 0
+    case 'anulada':       return 1
+    case 'media_ganada':  return (c + 1) / 2
+    case 'media_perdida': return 0.5
+    default:              return null
+  }
 }
 
 export function resultado(apuesta) {
-  const e = estado(apuesta.selecciones)
+  const sel = apuesta.selecciones || []
+  if (estado(sel) === 'pendiente') return 0
+
   const stake = Number(apuesta.stake) || 0
-  if (e === 'ganada') return stake * (cuotaTotal(apuesta.selecciones) - 1)
-  if (e === 'perdida') return -stake
-  return 0
+  const producto = sel.reduce((a, s) => a * multiplicador(s), 1)
+  if (producto === 0) return -stake
+
+  // Si anotaste la cuota de la casa, se ajusta al total real del boleto
+  const bruto = cuotaTotal(sel)
+  const ajuste = Number(apuesta.cuota_total) > 1 && bruto > 0
+    ? Number(apuesta.cuota_total) / bruto
+    : 1
+
+  return stake * (producto * ajuste - 1)
 }
 
 export const probImplicita = cuota => (cuota > 1 ? 1 / cuota : 0)
@@ -52,7 +86,7 @@ export const REGLAS = {
 
 /** Aplica los filtros duros. Devuelve {ok, texto}. */
 export function filtro(miProb, cuota) {
-  if (!(cuota > 1) || !(miProb > 0)) return { ok: false, texto: '' }
+  if (!(cuota > 1) || !(miProb > 0)) return null
   if (cuota < REGLAS.cuotaMin || cuota > REGLAS.cuotaMax)
     return { ok: false, texto: 'Cuota fuera del rango 1.50–5.00' }
   const e = edge(miProb, cuota)
@@ -70,7 +104,7 @@ export const clv = (tomada, cierre) =>
 export function resumen(apuestas = [], casas = []) {
   const conEstado = apuestas.map(a => ({ ...a, _e: estado(a.selecciones), _r: resultado(a) }))
   const resueltas = conEstado.filter(a => a._e !== 'pendiente')
-  const ganadas = resueltas.filter(a => a._e === 'ganada')
+  const ganadas = resueltas.filter(a => a._r > 0)
   const apostado = resueltas.reduce((s, a) => s + Number(a.stake), 0)
   const neto = conEstado.reduce((s, a) => s + a._r, 0)
   const inicial = casas.reduce((s, c) => s + Number(c.saldo_inicial || 0), 0)
@@ -81,11 +115,11 @@ export function resumen(apuestas = [], casas = []) {
     .filter(v => v !== null)
 
   const porTipo = esParlay => {
-    const g = resueltas.filter(a => (a.selecciones.length > 1) === esParlay)
+    const g = resueltas.filter(a => ((a.selecciones || []).length > 1) === esParlay)
     return {
       n: g.length,
       neto: g.reduce((s, a) => s + a._r, 0),
-      acierto: g.length ? g.filter(a => a._e === 'ganada').length / g.length : null
+      acierto: g.length ? g.filter(a => a._r > 0).length / g.length : null
     }
   }
 
