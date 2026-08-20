@@ -6,11 +6,13 @@ import Resumen from './components/Resumen'
 import NuevaApuesta from './components/NuevaApuesta'
 import Historial from './components/Historial'
 import Casas from './components/Casas'
+import Analisis from './components/Analisis'
 
 const TABS = [
   ['resumen', 'Resumen'],
   ['nueva', 'Registrar'],
   ['historial', 'Historial'],
+  ['analisis', 'Análisis'],
   ['casas', 'Casas']
 ]
 
@@ -94,6 +96,7 @@ export default function App() {
             {tab === 'historial' && (
               <Historial apuestas={apuestas} casas={casas} onCambio={cargar} toast={toast} />
             )}
+            {tab === 'analisis' && <Analisis toast={toast} />}
             {tab === 'casas' && <Casas casas={casas} onCambio={cargar} toast={toast} />}
           </>}
 
