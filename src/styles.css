@@ -495,3 +495,13 @@ button.mini:hover{color:var(--ink)}
   --cerrada-fondo: #D8E6F5;
 }
 .bet{border-left-width:6px}
+
+/* comparador de comisiones */
+.cuotas-fila{display:flex;flex-wrap:wrap;gap:8px}
+.cuota-item{display:flex;align-items:center;gap:2px}
+.cuota-item input{
+  width:82px;text-align:center;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+}
+nav button{font-size:10.5px;letter-spacing:.08em}
+
