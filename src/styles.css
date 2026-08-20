@@ -121,3 +121,48 @@ button.tiny.lose.on{background:var(--loss);color:#fff;border-color:var(--loss)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--ink);
   color:var(--paper-2);padding:11px 20px;font:500 13px "IBM Plex Sans Condensed",sans-serif;z-index:60}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ─────────────────────────────────────────────────────────────
+   PEGA ESTO AL FINAL de src/styles.css
+   Estilos para el selector Simple/Combinada y mercados múltiples
+   ───────────────────────────────────────────────────────────── */
+
+.tipos{
+  display:flex;
+  gap:1px;
+  background:var(--rule-hard);
+  border:1px solid var(--rule-hard);
+  margin-bottom:16px;
+}
+.tipo{
+  flex:1;
+  padding:11px 8px;
+  background:var(--card);
+  border:0;
+  cursor:pointer;
+  color:var(--ink-soft);
+  font:600 12px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.tipo.on{
+  background:var(--ink);
+  color:var(--paper-2);
+}
+.tipo:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
+
+.con-x{display:flex;align-items:center;gap:6px}
+.con-x input{flex:1}
+
+button.mini{
+  background:none;
+  border:0;
+  padding:4px 0;
+  cursor:pointer;
+  color:var(--ink-soft);
+  font:500 11.5px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.04em;
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+button.mini:hover{color:var(--ink)}
