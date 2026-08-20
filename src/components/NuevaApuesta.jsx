@@ -1,82 +1,92 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { cuotaTotal, probCombinada, filtro, kelly } from '../lib/calc'
+import { cuotaTotal, filtro, kelly } from '../lib/calc'
+import { parseCupon } from '../lib/parseCupon'
+import AutoInput from './AutoInput'
 
-/* Tipos de mercado con sus selecciones frecuentes como atajo.
-   Si falta alguno, se elige "Otro" y se escribe libre. */
-const MERCADOS = {
-  '1x2':                 ['1', 'X', '2'],
-  'Doble oportunidad':   ['1X', '12', 'X2'],
-  'Apuesta sin empate':  ['1', '2'],
-  'Total de goles':      ['Más de 1.5', 'Más de 2.5', 'Más de 3.5', 'Menos de 2.5', 'Menos de 3.5', 'Más de 1.25', 'Más de 0.5'],
-  'Hándicap':            ['+0.5', '+1', '+1.5', '+2', '-0.5', '-1', '-1.5', '-2'],
-  'Hándicap 1x2':        ['1 (1:0)', '1 (2:0)', '2 (0:1)', '2 (0:2)'],
-  'Ambos marcan':        ['Sí', 'No'],
-  'Se clasifica':        ['1', '2'],
-  'Total individual':    ['Más de 0.5', 'Más de 1.5', 'Más de 2.5'],
-  'Primera mitad':       ['1', 'X', '2', 'Más de 0.5', 'Más de 1.5', 'Menos de 1.5'],
-  'Segunda mitad':       ['1', 'X', '2', 'Más de 0.5', 'Más de 1.5'],
-  'Marca en ambas':      ['Sí', 'No'],
-  'Gana alguna mitad':   ['Sí', 'No'],
-  'Resultado exacto':    [],
-  'Tiros de esquina':    ['Más de 8.5', 'Más de 9.5', 'Más de 10.5', 'Menos de 10.5'],
-  'Tarjetas':            ['Más de 3.5', 'Más de 4.5', 'Menos de 4.5'],
-  'Marcador correcto':   [],
-  'Primer goleador':     [],
-  'Otro':                []
+/* Tipos base con sus selecciones frecuentes como atajo.
+   La lista crece sola con los tipos que uses. */
+const BASE = {
+  '1x2':                ['1', 'X', '2'],
+  'Doble oportunidad':  ['1X', '12', 'X2'],
+  'Apuesta sin empate': ['1', '2'],
+  'Total de goles':     ['Más de 1.5', 'Más de 1.75', 'Más de 2.5', 'Menos de 2.5', 'Más de 1.25'],
+  'Hándicap':           ['+0.5', '+1', '+1.5', '-0.5', '-1', '-1.5'],
+  'Hándicap 1x2':       ['1 (1:0)', '1 (2:0)', '2 (0:1)', '2 (0:2)'],
+  'Ambos equipos marcan': ['Sí', 'No'],
+  'Se clasifica':       ['1', '2'],
+  'Total individual':   ['Más de 0.5', 'Más de 1.5', 'Más de 2.5'],
+  '1ª Mitad - total':   ['Más de 0.5', 'Más de 1.5', 'Menos de 1.5'],
+  '1ª Mitad - doble oportunidad': [],
+  'Marca en ambos tiempos': ['Sí', 'No'],
+  'Gana alguna mitad':  ['Sí', 'No'],
+  'Total Tiros De Esquina': ['Más de 8.5', 'Más de 9.5', 'Menos de 10.5'],
+  'Total de tarjetas':  ['Más de 3.5', 'Menos de 4.5'],
+  'Resultado exacto':   [],
+  'Otro':               []
 }
-const TIPOS = Object.keys(MERCADOS)
 
-const mercadoVacio  = () => ({ tipo: '1x2', seleccion: '' })
+const mercadoVacio = () => ({ tipo: '1x2', seleccion: '' })
 const legVacia = () => ({
   local: '', visitante: '', mercados: [mercadoVacio()],
   cuota: '', mi_prob: '', cuota_cierre: ''
 })
 
-let ultimaCasa = null   // se recuerda durante la sesión
+let ultimaCasa = null
 
 export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   const hoy = new Date().toISOString().slice(0, 10)
-  const [tipo, setTipo]         = useState('simple')
-  const [fecha, setFecha]       = useState(hoy)
-  const [casaId, setCasaId]     = useState(ultimaCasa ?? casas[0]?.id ?? '')
-  const [stake, setStake]       = useState('')
+  const [tipo, setTipo]           = useState('simple')
+  const [fecha, setFecha]         = useState(hoy)
+  const [casaId, setCasaId]       = useState(ultimaCasa ?? casas[0]?.id ?? '')
+  const [stake, setStake]         = useState('')
   const [cuotaCasa, setCuotaCasa] = useState('')
-  const [legs, setLegs]         = useState([legVacia()])
+  const [legs, setLegs]           = useState([legVacia()])
   const [guardando, setGuardando] = useState(false)
 
-  const [histEquipos, setHistEquipos]   = useState([])
-  const [histSelecciones, setHistSel]   = useState([])
+  const [pegando, setPegando] = useState(false)
+  const [cupon, setCupon]     = useState('')
+
+  const [histEquipos, setHistEquipos] = useState([])
+  const [histTipos, setHistTipos]     = useState([])
+  const [histSel, setHistSel]         = useState([])
 
   useEffect(() => {
     let vivo = true
     supabase.from('selecciones')
       .select('partido, mercado')
       .order('id', { ascending: false })
-      .limit(500)
+      .limit(600)
       .then(({ data }) => {
         if (!vivo || !data) return
-        const equipos = [...new Set(
-          data.flatMap(s => (s.partido || '').split(/\s+vs\.?\s+/i)).map(t => t.trim()).filter(Boolean)
-        )].sort()
-        const sels = [...new Set(
-          data.flatMap(s => (s.mercado || '').split(' · '))
-              .map(t => (t.includes(':') ? t.split(':').slice(1).join(':') : t).trim())
-              .filter(Boolean)
-        )].slice(0, 50)
-        setHistEquipos(equipos)
-        setHistSel(sels)
+        setHistEquipos([...new Set(
+          data.flatMap(s => (s.partido || '').split(/\s+vs\.?\s+/i))
+              .map(t => t.trim()).filter(Boolean)
+        )].sort())
+        const partes = data.flatMap(s => (s.mercado || '').split(' · ')).filter(Boolean)
+        setHistTipos([...new Set(
+          partes.map(t => (t.includes(':') ? t.split(':')[0] : '').trim()).filter(Boolean)
+        )].sort())
+        setHistSel([...new Set(
+          partes.map(t => (t.includes(':') ? t.split(':').slice(1).join(':') : t).trim())
+                .filter(Boolean)
+        )])
       })
     return () => { vivo = false }
   }, [])
 
+  const TIPOS = useMemo(
+    () => [...new Set([...Object.keys(BASE).filter(t => t !== 'Otro'), ...histTipos, 'Otro'])],
+    [histTipos]
+  )
+  const atajos = t => BASE[t] ?? []
+
   const up = (i, k, v) => setLegs(l => l.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
   const upMerc = (i, j, k, v) =>
     setLegs(l => l.map((x, ix) => ix === i
-      ? { ...x, mercados: x.mercados.map((m, jx) => (jx === j ? { ...m, [k]: v } : m)) }
-      : x))
+      ? { ...x, mercados: x.mercados.map((m, jx) => (jx === j ? { ...m, [k]: v } : m)) } : x))
   const addMerc = i =>
-    setLegs(l => l.map((x, ix) => (ix === i ? { ...x, mercados: [...x.mercados, mercadoVacio()] } : x)))
+    setLegs(l => l.map((x, ix) => ix === i ? { ...x, mercados: [...x.mercados, mercadoVacio()] } : x))
   const delMerc = (i, j) =>
     setLegs(l => l.map((x, ix) => ix === i
       ? { ...x, mercados: x.mercados.filter((_, jx) => jx !== j) } : x))
@@ -91,18 +101,39 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   }
   function elegirCasa(id) { setCasaId(id); ultimaCasa = id }
 
+  /* ── importar cupón pegado ─────────────────────────────── */
+  function importar() {
+    const r = parseCupon(cupon)
+    if (!r.legs.length) return toast('No reconocí ninguna selección en ese texto')
+
+    setLegs(r.legs.map(l => ({
+      local: l.local,
+      visitante: l.visitante,
+      mercados: l.mercados.map(m => ({ tipo: m.tipo || 'Otro', seleccion: m.seleccion || '' })),
+      cuota: l.cuota != null ? String(l.cuota) : '',
+      mi_prob: '',
+      cuota_cierre: ''
+    })))
+    if (r.stake != null) setStake(String(r.stake))
+    if (r.total != null) setCuotaCasa(String(r.total))
+    setTipo(r.legs.length > 1 ? 'combinada' : 'simple')
+    setPegando(false)
+    setCupon('')
+    toast(`${r.legs.length} ${r.legs.length === 1 ? 'selección leída' : 'selecciones leídas'} — revísalas`)
+  }
+
   const nombre = l => [l.local.trim(), l.visitante.trim()].filter(Boolean).join(' vs ')
 
   const conCuota   = legs.filter(l => Number(l.cuota) > 1)
-  const conEquipos = legs.filter(l => l.local.trim() && l.visitante.trim())
+  const conEquipos = legs.filter(l => l.local.trim() || l.visitante.trim())
   const sinCuota   = conEquipos.filter(l => !(Number(l.cuota) > 1)).length
 
-  const sel        = conCuota.map(l => ({ cuota: Number(l.cuota) }))
-  const producto   = cuotaTotal(sel)
-  const manual     = Number(cuotaCasa)
-  const totalReal  = manual > 1 ? manual : producto
-  const prob       = totalReal > 1 ? 1 / totalReal : 0
-  const desvia     = manual > 1 && producto > 1 && Math.abs(manual / producto - 1) > 0.02
+  const sel       = conCuota.map(l => ({ cuota: Number(l.cuota) }))
+  const producto  = cuotaTotal(sel)
+  const manual    = Number(cuotaCasa)
+  const totalReal = manual > 1 ? manual : producto
+  const prob      = totalReal > 1 ? 1 / totalReal : 0
+  const desvia    = manual > 1 && producto > 1 && Math.abs(manual / producto - 1) > 0.02
 
   const esSimple = tipo === 'simple' && Number(legs[0]?.cuota) > 1 && Number(legs[0]?.mi_prob) > 0
   const miProb   = esSimple ? Number(legs[0].mi_prob) / 100 : 0
@@ -130,10 +161,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
 
     setGuardando(true)
     const { data: apuesta, error: e1 } = await supabase.from('apuestas')
-      .insert({
-        fecha, casa_id: casaId || null, stake: s,
-        cuota_total: manual > 1 ? manual : null
-      })
+      .insert({ fecha, casa_id: casaId || null, stake: s, cuota_total: manual > 1 ? manual : null })
       .select().single()
     if (e1) { setGuardando(false); return toast('No se pudo guardar: ' + e1.message) }
 
@@ -169,12 +197,32 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         </p>
       </header>
 
-      <datalist id="dl-equipos">
-        {histEquipos.map(e => <option key={e} value={e} />)}
-      </datalist>
-      <datalist id="dl-selecciones">
-        {histSelecciones.map(s => <option key={s} value={s} />)}
-      </datalist>
+      {/* ── pegar cupón ─────────────────────────────── */}
+      {!pegando ? (
+        <button className="ghost" style={{ marginBottom: 16 }} onClick={() => setPegando(true)}>
+          ⎘ Pegar cupón de la casa
+        </button>
+      ) : (
+        <div className="card pegar">
+          <div className="field">
+            <label htmlFor="cupon">Pega aquí el texto del cupón</label>
+            <textarea id="cupon" rows={7} value={cupon}
+                      onChange={e => setCupon(e.target.value)}
+                      placeholder={'Celtic FC vs. LASK\nApuesta sin empate: 1   Cuotas: 1.25\n…'} />
+          </div>
+          <p className="ayuda">
+            En la casa, abre el cupón, selecciona el texto y cópialo. No sirve una captura
+            de pantalla: tiene que ser el texto. Después de importar, <strong>revisa cada
+            línea</strong> antes de guardar.
+          </p>
+          <div className="row c2" style={{ marginTop: 12 }}>
+            <button className="act" onClick={importar}>Leer cupón</button>
+            <button className="ghost" onClick={() => { setPegando(false); setCupon('') }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="segmented">
         <button className={tipo === 'simple' ? 'on' : ''}
@@ -207,9 +255,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
       </div>
 
       <div className="sec-label">
-        <span className="eyebrow">
-          {tipo === 'simple' ? 'La selección' : 'Selecciones'}
-        </span>
+        <span className="eyebrow">{tipo === 'simple' ? 'La selección' : 'Selecciones'}</span>
         {tipo === 'combinada' && <span className="contador">{legs.length}</span>}
       </div>
 
@@ -228,14 +274,14 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <div className="enfrenta">
               <div className="field">
                 <label htmlFor={`loc${i}`}>Local</label>
-                <input id={`loc${i}`} value={l.local} list="dl-equipos"
-                       onChange={e => up(i, 'local', e.target.value)} placeholder="Celtic" />
+                <AutoInput id={`loc${i}`} value={l.local} opciones={histEquipos}
+                           onChange={v => up(i, 'local', v)} placeholder="Celtic" />
               </div>
               <span className="vs" aria-hidden="true">vs</span>
               <div className="field">
                 <label htmlFor={`vis${i}`}>Visitante</label>
-                <input id={`vis${i}`} value={l.visitante} list="dl-equipos"
-                       onChange={e => up(i, 'visitante', e.target.value)} placeholder="LASK" />
+                <AutoInput id={`vis${i}`} value={l.visitante} opciones={histEquipos}
+                           onChange={v => up(i, 'visitante', v)} placeholder="LASK" />
               </div>
             </div>
 
@@ -249,18 +295,21 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
                     <button className="x" onClick={() => delMerc(i, j)}
                             aria-label="Quitar mercado">×</button>}
                 </div>
-                <div className="row c2 tight">
-                  <select value={m.tipo} aria-label="Tipo de mercado"
-                          onChange={e => upMerc(i, j, 'tipo', e.target.value)}>
-                    {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input value={m.seleccion} list="dl-selecciones" aria-label="Selección"
-                         onChange={e => upMerc(i, j, 'seleccion', e.target.value)}
-                         placeholder={m.tipo === 'Otro' ? 'escríbelo entero' : 'la selección'} />
+
+                <div className="row tight">
+                  <AutoInput value={m.tipo} opciones={TIPOS} ariaLabel="Tipo de mercado"
+                             onChange={v => upMerc(i, j, 'tipo', v)}
+                             placeholder="Total de goles" />
                 </div>
-                {MERCADOS[m.tipo].length > 0 && (
+                <div className="row tight">
+                  <AutoInput value={m.seleccion} opciones={histSel} ariaLabel="Selección"
+                             onChange={v => upMerc(i, j, 'seleccion', v)}
+                             placeholder="Más de 2.5" />
+                </div>
+
+                {atajos(m.tipo).length > 0 && (
                   <div className="chips">
-                    {MERCADOS[m.tipo].map(op => (
+                    {atajos(m.tipo).map(op => (
                       <button key={op} className={`chip ${m.seleccion === op ? 'on' : ''}`}
                               onClick={() => upMerc(i, j, 'seleccion', op)}>{op}</button>
                     ))}
@@ -287,6 +336,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
                        onChange={e => up(i, 'cuota_cierre', e.target.value)} placeholder="opcional" />
               </div>
             </div>
+
             {tipo === 'simple' && (
               <div className="field">
                 <label htmlFor={`x${i}`}>Tu probabilidad estimada</label>
@@ -314,9 +364,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
                    placeholder={producto > 1 ? producto.toFixed(2) : 'opcional'} />
           </div>
           <p className="ayuda">
-            Las casas redondean cada pata, así que el total del boleto casi nunca
-            coincide con multiplicar las cuotas. Copia aquí el número exacto de tu
-            cupón y los cálculos usarán ese.
+            Las casas redondean cada pata, así que el total del boleto casi nunca coincide
+            con multiplicar las cuotas. Copia aquí el número exacto de tu cupón y los
+            cálculos usarán ese.
           </p>
         </div>
       )}
