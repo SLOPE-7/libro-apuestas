@@ -24,9 +24,11 @@ export function estadoApuesta(a) {
 /** Una perdida -> perdida. Todas resueltas -> resuelta. Resto -> pendiente. */
 export function estado(sel = []) {
   if (!sel.length) return 'pendiente'
-  if (sel.some(s => s.estado === 'pendiente' || !s.estado)) return 'pendiente'
-  return sel.some(s => multiplicador(s) === 0) ? 'perdida' : 'ganada'
+  if (sel.some(s => multiplicador(s) === 0)) return 'perdida'
+  if (sel.some(s => !s.estado || s.estado === 'pendiente')) return 'pendiente'
+  return 'ganada'
 }
+
 
 /**
  * Lo que aporta cada selección al boleto.
