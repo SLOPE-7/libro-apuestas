@@ -1,25 +1,75 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { cuotaTotal, probCombinada, filtro, kelly } from '../lib/calc'
 
-const legVacia = () => ({ partido: '', mercados: [''], cuota: '', mi_prob: '', cuota_cierre: '' })
+/* Tipos de mercado más usados, con sus selecciones frecuentes como atajo.
+   Si falta alguno, se escribe a mano eligiendo "Otro". */
+const MERCADOS = {
+  '1x2':                ['1', 'X', '2'],
+  'Doble oportunidad':  ['1X', '12', 'X2'],
+  'Apuesta sin empate': ['1', '2'],
+  'Total de goles':     ['Más de 1.5', 'Más de 2.5', 'Menos de 2.5', 'Más de 1.25', 'Más de 0.5'],
+  'Hándicap':           ['+0.5', '+1', '+1.5', '-0.5', '-1', '-1.5'],
+  'Hándicap 1x2':       ['1 (1:0)', '1 (2:0)', '2 (0:1)', '2 (0:2)'],
+  'Ambos marcan':       ['Sí', 'No'],
+  'Se clasifica':       ['1', '2'],
+  'Total individual':   ['Más de 0.5', 'Más de 1.5', 'Más de 2.5'],
+  'Primera mitad':      ['Más de 0.5', 'Más de 1.5', 'Menos de 1.5', '1', 'X', '2'],
+  'Tiros de esquina':   ['Más de 8.5', 'Más de 9.5', 'Menos de 10.5'],
+  'Tarjetas':           ['Más de 3.5', 'Menos de 4.5'],
+  'Otro':               []
+}
+const TIPOS = Object.keys(MERCADOS)
+
+const mercadoVacio = () => ({ tipo: '1x2', seleccion: '' })
+const legVacia = () => ({ partido: '', mercados: [mercadoVacio()], cuota: '', mi_prob: '', cuota_cierre: '' })
+
+let ultimaCasa = null   // se recuerda mientras dure la sesión
 
 export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   const hoy = new Date().toISOString().slice(0, 10)
-  const [tipo, setTipo] = useState('simple')          // 'simple' | 'combinada'
+  const [tipo, setTipo] = useState('simple')
   const [fecha, setFecha] = useState(hoy)
-  const [casaId, setCasaId] = useState(casas[0]?.id ?? '')
+  const [casaId, setCasaId] = useState(ultimaCasa ?? casas[0]?.id ?? '')
   const [stake, setStake] = useState('')
   const [legs, setLegs] = useState([legVacia()])
   const [guardando, setGuardando] = useState(false)
 
+  // Historial para sugerencias
+  const [histPartidos, setHistPartidos] = useState([])
+  const [histSelecciones, setHistSelecciones] = useState([])
+
+  useEffect(() => {
+    let vivo = true
+    supabase
+      .from('selecciones')
+      .select('partido, mercado')
+      .order('id', { ascending: false })
+      .limit(400)
+      .then(({ data }) => {
+        if (!vivo || !data) return
+        const partidos = [...new Set(data.map(s => s.partido).filter(Boolean))].slice(0, 60)
+        // De "Total de goles: Más de 2.5 · Ambos marcan: Sí" saca las selecciones sueltas
+        const sels = [...new Set(
+          data.flatMap(s => (s.mercado || '').split(' · '))
+              .map(t => (t.includes(':') ? t.split(':').slice(1).join(':') : t).trim())
+              .filter(Boolean)
+        )].slice(0, 40)
+        setHistPartidos(partidos)
+        setHistSelecciones(sels)
+      })
+    return () => { vivo = false }
+  }, [])
+
   const up = (i, k, v) => setLegs(l => l.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
-  const upMercado = (i, j, v) =>
+  const upMerc = (i, j, k, v) =>
     setLegs(l => l.map((x, ix) =>
-      ix === i ? { ...x, mercados: x.mercados.map((m, jx) => (jx === j ? v : m)) } : x))
-  const addMercado = i =>
-    setLegs(l => l.map((x, ix) => (ix === i ? { ...x, mercados: [...x.mercados, ''] } : x)))
-  const delMercado = (i, j) =>
+      ix === i
+        ? { ...x, mercados: x.mercados.map((m, jx) => (jx === j ? { ...m, [k]: v } : m)) }
+        : x))
+  const addMerc = i =>
+    setLegs(l => l.map((x, ix) => (ix === i ? { ...x, mercados: [...x.mercados, mercadoVacio()] } : x)))
+  const delMerc = (i, j) =>
     setLegs(l => l.map((x, ix) =>
       ix === i ? { ...x, mercados: x.mercados.filter((_, jx) => jx !== j) } : x))
 
@@ -28,23 +78,31 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
 
   function cambiarTipo(t) {
     setTipo(t)
-    if (t === 'simple') setLegs(l => [l[0]])           // se queda solo la primera
+    if (t === 'simple') setLegs(l => [l[0]])
     else if (legs.length === 1) setLegs(l => [...l, legVacia()])
   }
+  function elegirCasa(id) { setCasaId(id); ultimaCasa = id }
 
-  const sel = legs.map(l => ({ cuota: Number(l.cuota) })).filter(s => s.cuota > 1)
+  const conCuota = legs.filter(l => Number(l.cuota) > 1)
+  const conPartido = legs.filter(l => l.partido.trim())
+  const faltanCuota = conPartido.length - conCuota.filter(l => l.partido.trim()).length
+
+  const sel = conCuota.map(l => ({ cuota: Number(l.cuota) }))
   const total = cuotaTotal(sel)
   const prob = probCombinada(sel)
 
-  // Filtro y Kelly solo aplican a simples con probabilidad estimada
   const esSimple = tipo === 'simple' && Number(legs[0]?.cuota) > 1 && Number(legs[0]?.mi_prob) > 0
   const miProb = esSimple ? Number(legs[0].mi_prob) / 100 : 0
   const f = esSimple ? filtro(miProb, Number(legs[0].cuota)) : null
   const k = esSimple ? kelly(miProb, Number(legs[0].cuota)) : 0
 
-  // Aviso si repites partido en una combinada
   const nombres = legs.map(l => l.partido.trim().toLowerCase()).filter(Boolean)
   const repetido = tipo === 'combinada' && new Set(nombres).size < nombres.length
+
+  const textoMercado = m =>
+    m.tipo === 'Otro'
+      ? m.seleccion.trim()
+      : [m.tipo, m.seleccion.trim()].filter(Boolean).join(': ')
 
   async function guardar() {
     const s = Number(stake)
@@ -56,8 +114,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
     const { data: apuesta, error: e1 } = await supabase
       .from('apuestas')
       .insert({ fecha, casa_id: casaId || null, stake: s })
-      .select()
-      .single()
+      .select().single()
 
     if (e1) { setGuardando(false); return toast('No se pudo guardar: ' + e1.message) }
 
@@ -66,7 +123,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         apuesta_id: apuesta.id,
         orden: i,
         partido: l.partido.trim(),
-        mercado: l.mercados.map(m => m.trim()).filter(Boolean).join(' · ') || null,
+        mercado: l.mercados.map(textoMercado).filter(Boolean).join(' · ') || null,
         cuota: Number(l.cuota),
         mi_prob: Number(l.mi_prob) > 0 ? Number(l.mi_prob) / 100 : null,
         cuota_cierre: Number(l.cuota_cierre) > 1 ? Number(l.cuota_cierre) : null
@@ -96,18 +153,19 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         mejor de lo que vas.
       </p>
 
-      {/* selector de tipo */}
+      {/* listas de sugerencias */}
+      <datalist id="dl-partidos">
+        {histPartidos.map(p => <option key={p} value={p} />)}
+      </datalist>
+      <datalist id="dl-selecciones">
+        {histSelecciones.map(s => <option key={s} value={s} />)}
+      </datalist>
+
       <div className="tipos">
-        <button
-          className={`tipo ${tipo === 'simple' ? 'on' : ''}`}
-          onClick={() => cambiarTipo('simple')}>
-          Simple
-        </button>
-        <button
-          className={`tipo ${tipo === 'combinada' ? 'on' : ''}`}
-          onClick={() => cambiarTipo('combinada')}>
-          Combinada
-        </button>
+        <button className={`tipo ${tipo === 'simple' ? 'on' : ''}`}
+                onClick={() => cambiarTipo('simple')}>Simple</button>
+        <button className={`tipo ${tipo === 'combinada' ? 'on' : ''}`}
+                onClick={() => cambiarTipo('combinada')}>Combinada</button>
       </div>
 
       <div className="card">
@@ -118,7 +176,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
           </div>
           <div>
             <label htmlFor="casa">Casa</label>
-            <select id="casa" value={casaId} onChange={e => setCasaId(e.target.value)}>
+            <select id="casa" value={casaId} onChange={e => elegirCasa(e.target.value)}>
               {casas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </div>
@@ -151,31 +209,49 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <div className="row">
               <div>
                 <label htmlFor={`p${i}`}>Partido</label>
-                <input id={`p${i}`} value={l.partido}
+                <input id={`p${i}`} value={l.partido} list="dl-partidos"
                        onChange={e => up(i, 'partido', e.target.value)}
                        placeholder="Celtic vs LASK" />
               </div>
             </div>
 
             {l.mercados.map((m, j) => (
-              <div className="row" key={j}>
-                <div>
-                  <label htmlFor={`m${i}-${j}`}>
-                    {j === 0 ? 'Mercado' : `Mercado ${j + 1} (mismo partido)`}
+              <div className="merc" key={j}>
+                <div className="merc-top">
+                  <label htmlFor={`mt${i}-${j}`} style={{ margin: 0 }}>
+                    {j === 0 ? 'Mercado' : `Mercado ${j + 1} · mismo partido`}
                   </label>
-                  <div className="con-x">
-                    <input id={`m${i}-${j}`} value={m}
-                           onChange={e => upMercado(i, j, e.target.value)}
-                           placeholder={j === 0 ? 'Más de 2.5' : 'Ambos marcan'} />
-                    {l.mercados.length > 1 &&
-                      <button className="x" onClick={() => delMercado(i, j)}
-                              aria-label="Quitar mercado">×</button>}
-                  </div>
+                  {l.mercados.length > 1 &&
+                    <button className="x" onClick={() => delMerc(i, j)}
+                            aria-label="Quitar mercado">×</button>}
                 </div>
+
+                <div className="row c2" style={{ marginBottom: 7 }}>
+                  <select id={`mt${i}-${j}`} value={m.tipo}
+                          onChange={e => upMerc(i, j, 'tipo', e.target.value)}>
+                    {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input value={m.seleccion} list="dl-selecciones"
+                         onChange={e => upMerc(i, j, 'seleccion', e.target.value)}
+                         placeholder={m.tipo === 'Otro' ? 'escríbelo entero' : 'la selección'}
+                         aria-label="Selección" />
+                </div>
+
+                {MERCADOS[m.tipo].length > 0 && (
+                  <div className="chips">
+                    {MERCADOS[m.tipo].map(op => (
+                      <button key={op}
+                              className={`chip ${m.seleccion === op ? 'on' : ''}`}
+                              onClick={() => upMerc(i, j, 'seleccion', op)}>
+                        {op}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 
-            <button className="mini" onClick={() => addMercado(i)}>
+            <button className="mini" onClick={() => addMerc(i)}>
               + Otro mercado en este partido
             </button>
 
@@ -208,6 +284,13 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
           <button className="ghost" onClick={addLeg}>+ Añadir otro partido</button>}
       </div>
 
+      {faltanCuota > 0 && (
+        <div className="flag">
+          <strong>{faltanCuota} {faltanCuota === 1 ? 'partido no tiene' : 'partidos no tienen'} cuota.</strong>{' '}
+          Sin cuota no cuentan y no se guardarán.
+        </div>
+      )}
+
       {repetido && (
         <div className="flag">
           <strong>Has puesto el mismo partido dos veces.</strong> Si son mercados del mismo
@@ -239,7 +322,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <div className="note">
               {sel.length === 1
                 ? <>Apuesta simple. Cuota <strong>{total.toFixed(2)}</strong>.</>
-                : <><strong>{sel.length} partidos.</strong> Cuota combinada {total.toFixed(2)}.
+                : <><strong>{sel.length} partidos con cuota.</strong> Cuota combinada {total.toFixed(2)}.
                     Fallar uno solo lo pierde todo, y cada partido extra suma el margen
                     de la casa otra vez.</>}
             </div>
