@@ -15,14 +15,14 @@ const TABS = [
 ]
 
 export default function App() {
-  const [sesion, setSesion] = useState(undefined) // undefined = comprobando
+  const [sesion, setSesion] = useState(undefined)
   const [casas, setCasas] = useState([])
   const [apuestas, setApuestas] = useState([])
   const [tab, setTab] = useState('resumen')
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
 
-  const toast = m => { setAviso(m); setTimeout(() => setAviso(''), 2200) }
+  const toast = m => { setAviso(m); setTimeout(() => setAviso(''), 2300) }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSesion(data.session))
@@ -61,16 +61,19 @@ export default function App() {
 
   return (
     <div className="wrap">
-      <header>
+      <header className="app">
         <h1>Libro de apuestas</h1>
         <span className="folio">
-          {apuestas.length ? `${apuestas.length} asiento${apuestas.length > 1 ? 's' : ''}` : 'sin asientos'}
+          {apuestas.length
+            ? `${apuestas.length} asiento${apuestas.length > 1 ? 's' : ''}`
+            : 'sin asientos'}
         </span>
       </header>
 
       <nav role="tablist">
         {TABS.map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} onClick={() => { setTab(id); window.scrollTo(0, 0) }}>
+          <button key={id} role="tab" aria-selected={tab === id}
+                  onClick={() => { setTab(id); window.scrollTo(0, 0) }}>
             {label}
           </button>
         ))}
