@@ -38,6 +38,31 @@ export default function Analisis({ toast }) {
   const [local, setLocal] = useState('')
   const [visitante, setVisitante] = useState('')
   const [competicion, setCompeticion] = useState('')
+    const MERCADOS_BASE = [
+    '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
+    'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
+  ]
+  const SUGERIDOS = [
+    'Más de 1.5 goles', 'Más de 2.5 goles', 'Más de 3.5 goles',
+    'Menos de 2.5 goles', 'Ambos equipos marcan',
+    '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
+    'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
+    'Más de 8.5 córners', 'Más de 9.5 córners', 'Más de 10.5 córners',
+    'Menos de 9.5 córners', 'Menos de 10.5 córners',
+    'Más de 3.5 tarjetas', 'Más de 4.5 tarjetas', 'Menos de 4.5 tarjetas',
+    'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
+  ]
+  const [mercadosPedidos, setMercadosPedidos] = useState(MERCADOS_BASE)
+  const [nuevoMercado, setNuevoMercado] = useState('')
+
+  const alternarMercado = m =>
+    setMercadosPedidos(l => l.includes(m) ? l.filter(x => x !== m) : [...l, m])
+  const añadirMercado = () => {
+    const t = nuevoMercado.trim()
+    if (t && !mercadosPedidos.includes(t)) setMercadosPedidos(l => [...l, t])
+    setNuevoMercado('')
+  }
+
   const [pidiendo, setPidiendo] = useState(false)
   const [respuesta, setRespuesta] = useState(null)
   const [abierto, setAbierto] = useState(null)
