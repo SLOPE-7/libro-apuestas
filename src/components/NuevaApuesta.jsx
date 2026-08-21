@@ -4,8 +4,6 @@ import { cuotaTotal, filtro, kelly } from '../lib/calc'
 import { parseCupon } from '../lib/parseCupon'
 import AutoInput from './AutoInput'
 
-/* Tipos base con sus selecciones frecuentes como atajo.
-   La lista crece sola con los tipos que uses. */
 const BASE = {
   '1x2':                ['1', 'X', '2'],
   'Doble oportunidad':  ['1X', '12', 'X2'],
@@ -101,7 +99,6 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   }
   function elegirCasa(id) { setCasaId(id); ultimaCasa = id }
 
-  /* ── importar cupón pegado ─────────────────────────────── */
   function importar() {
     const r = parseCupon(cupon)
     if (!r.legs.length) return toast('No reconocí ninguna selección en ese texto')
@@ -177,6 +174,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         orden: i,
         partido: nombre(l),
         mercado: l.mercados.map(textoMercado).filter(Boolean).join(' · ') || null,
+        mercados: l.mercados.length > 1
+          ? l.mercados.map(textoMercado).filter(Boolean).map(t => ({ t, e: 'pendiente' }))
+          : null,
         cuota: Number(l.cuota),
         mi_prob: Number(l.mi_prob) > 0 ? Number(l.mi_prob) / 100 : null,
         cuota_cierre: Number(l.cuota_cierre) > 1 ? Number(l.cuota_cierre) : null
@@ -203,7 +203,6 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         </p>
       </header>
 
-      {/* ── pegar cupón ─────────────────────────────── */}
       {!pegando ? (
         <button className="ghost" style={{ marginBottom: 16 }} onClick={() => setPegando(true)}>
           ⎘ Pegar cupón de la casa
