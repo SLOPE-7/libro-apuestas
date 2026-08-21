@@ -24,11 +24,11 @@ export function estadoApuesta(a) {
 /** Una perdida -> perdida. Todas resueltas -> resuelta. Resto -> pendiente. */
 export function estado(sel = []) {
   if (!sel.length) return 'pendiente'
+  // una sola fallada tumba el boleto, aunque el resto siga en juego
   if (sel.some(s => multiplicador(s) === 0)) return 'perdida'
-  if (sel.some(s => !s.estado || s.estado === 'pendiente')) return 'pendiente'
+  if (sel.some(s => estadoSeleccion(s) === 'pendiente')) return 'pendiente'
   return 'ganada'
 }
-
 
 /**
  * Lo que aporta cada selección al boleto.
@@ -38,9 +38,30 @@ export function estado(sel = []) {
  *   media ganada  -> (cuota+1)/2   media apuesta cobra, media se devuelve
  *   media perdida -> 0.5           media se pierde, media se devuelve
  */
+/**
+ * Estado de una selección.
+ * Si es un BetBuilder con varios mercados, se deduce de ellos:
+ * basta uno fallado para tumbar la selección entera.
+ */
+export function estadoSeleccion(s) {
+  const subs = Array.isArray(s?.mercados) ? s.mercados : null
+  if (!subs || subs.length < 2) return s?.estado || 'pendiente'
+  if (subs.some(m => m.e === 'perdida')) return 'perdida'
+  if (subs.some(m => !m.e || m.e === 'pendiente')) return 'pendiente'
+  if (subs.every(m => m.e === 'anulada')) return 'anulada'
+  return 'ganada'
+}
+
+/** ¿Se anuló alguna parte? La casa recalcula la cuota y hay que corregirla a mano. */
+export const tieneAnuladaParcial = s => {
+  const subs = Array.isArray(s?.mercados) ? s.mercados : null
+  return !!(subs && subs.length > 1 &&
+            subs.some(m => m.e === 'anulada') && subs.some(m => m.e === 'ganada'))
+}
+
 export function multiplicador(s) {
   const c = Number(s.cuota) || 1
-  switch (s.estado) {
+  switch (estadoSeleccion(s)) {
     case 'ganada':        return c
     case 'perdida':       return 0
     case 'anulada':       return 1
