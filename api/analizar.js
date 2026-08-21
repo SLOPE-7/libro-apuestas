@@ -57,7 +57,7 @@ Estima la probabilidad de cada uno de estos mercados:
       },
       body: JSON.stringify({
         model: MODELO,
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: INSTRUCCIONES,
         messages: [{ role: 'user', content: pregunta }],
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }]
