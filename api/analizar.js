@@ -14,6 +14,8 @@ REGLAS INNEGOCIABLES:
 
 5. Sé conservador. Las probabilidades reales del fútbol rara vez son extremas. Un favorito claro en casa gana sobre el 60-65%, no el 85%.
 
+6. Aunque no encuentres casi nada, DEBES responder igualmente con el objeto JSON. En ese caso pon confianza baja, explica la falta de datos en "datos", y da estimaciones amplias y prudentes. Nunca respondas solo con prosa.
+
 Responde SOLO con un objeto JSON válido, sin texto antes ni después, con esta forma exacta:
 
 {
@@ -74,14 +76,37 @@ Estima la probabilidad de cada uno de estos mercados:
       .join('\n')
       .trim()
 
-    let parsed = null
-    try {
-      const limpio = texto.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
-      const desde = limpio.indexOf('{')
-      const hasta = limpio.lastIndexOf('}')
-      parsed = JSON.parse(limpio.slice(desde, hasta + 1))
-    } catch {
-      return res.status(200).json({ crudo: texto, error: 'No devolvió JSON válido' })
+    // El modelo a veces envuelve el JSON en prosa o en vallas de código.
+    // Se rescata el primer objeto válido en vez de rendirse.
+    function rescatarJson(t) {
+      const sinVallas = t.replace(/```(?:json)?/gi, '').trim()
+      const inicios = []
+      for (let i = 0; i < sinVallas.length; i++) if (sinVallas[i] === '{') inicios.push(i)
+      for (const ini of inicios) {
+        let nivel = 0
+        for (let j = ini; j < sinVallas.length; j++) {
+          if (sinVallas[j] === '{') nivel++
+          else if (sinVallas[j] === '}') {
+            nivel--
+            if (nivel === 0) {
+              try {
+                const obj = JSON.parse(sinVallas.slice(ini, j + 1))
+                if (obj && Array.isArray(obj.mercados)) return obj
+              } catch { /* seguimos buscando */ }
+              break
+            }
+          }
+        }
+      }
+      return null
+    }
+
+    const parsed = rescatarJson(texto)
+    if (!parsed) {
+      return res.status(200).json({
+        crudo: texto.slice(0, 3000),
+        error: 'El modelo respondió en texto, no en el formato esperado. Suele pasar cuando encuentra poca información fiable sobre el partido.'
+      })
     }
 
     return res.status(200).json(parsed)
