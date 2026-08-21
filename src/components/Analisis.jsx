@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { comparar, costeMargen } from '../lib/margen'
+import AutoInput from './AutoInput'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v || 0).toFixed(2)
@@ -10,6 +11,7 @@ const mercadoVacio = () => ({ nombre: '', cuotas: ['', ''] })
 export default function Analisis({ toast }) {
   const [vista, setVista] = useState('margen')
 
+  /* ── comisiones ───────────────────────────────────────── */
   const [stake, setStake] = useState('20')
   const [mercados, setMercados] = useState([
     { nombre: '1X2', cuotas: ['', '', ''] },
@@ -30,63 +32,107 @@ export default function Analisis({ toast }) {
 
   const tabla = comparar(mercados.filter(m => m.nombre.trim()))
 
+  /* ── sombra ───────────────────────────────────────────── */
   const [registros, setRegistros] = useState([])
-  const [partido, setPartido] = useState('')
+  const [equipos, setEquipos] = useState([])
+  const [local, setLocal] = useState('')
+  const [visitante, setVisitante] = useState('')
   const [competicion, setCompeticion] = useState('')
   const [pidiendo, setPidiendo] = useState(false)
   const [respuesta, setRespuesta] = useState(null)
+  const [abierto, setAbierto] = useState(null)
+
+  const partido = [local.trim(), visitante.trim()].filter(Boolean).join(' vs ')
+
+  async function recargar() {
+    const { data } = await supabase.from('sombra')
+      .select('*').order('creado_en', { ascending: false }).limit(300)
+    setRegistros(data || [])
+  }
 
   useEffect(() => {
-    supabase.from('sombra').select('*').order('creado_en', { ascending: false }).limit(50)
-      .then(({ data }) => setRegistros(data || []))
+    recargar()
+    supabase.from('selecciones').select('partido').limit(600).then(({ data }) => {
+      if (!data) return
+      setEquipos([...new Set(
+        data.flatMap(s => (s.partido || '').split(/\s+vs\.?\s+/i))
+            .map(t => t.trim()).filter(Boolean)
+      )].sort())
+    })
   }, [])
 
   async function pedirAnalisis() {
-    if (!partido.trim()) return toast('Escribe el partido')
+    if (!partido) return toast('Escribe los dos equipos')
     setPidiendo(true); setRespuesta(null)
     try {
       const r = await fetch('/api/analizar', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ partido: partido.trim(), competicion: competicion.trim() })
+        body: JSON.stringify({ partido, competicion: competicion.trim() })
       })
       const data = await r.json()
       setPidiendo(false)
       if (data.error) return toast(data.error)
       setRespuesta(data)
-    } catch (e) {
+    } catch {
       setPidiendo(false)
       toast('No se pudo conectar con el análisis')
     }
   }
 
-  async function guardarSombra(m) {
-    const { error } = await supabase.from('sombra').insert({
-      partido: partido.trim(),
-      mercado_ia: m.mercado,
-      prob_ia: m.probabilidad,
-      confianza: respuesta.confianza ?? null,
-      razonamiento: [respuesta.datos, m.razon].filter(Boolean).join(' — ').slice(0, 2000)
-    })
+  async function guardarTodo() {
+    const lista = (respuesta?.mercados || [])
+    if (!lista.length) return
+    const { error } = await supabase.from('sombra').insert(
+      lista.map(m => ({
+        partido,
+        competicion: competicion.trim() || null,
+        mercado_ia: m.mercado,
+        prob_ia: m.probabilidad,
+        confianza: respuesta.confianza ?? null,
+        razonamiento: [respuesta.datos, respuesta.aviso].filter(Boolean).join('\n\n').slice(0, 4000)
+      }))
+    )
     if (error) return toast('No se pudo guardar: ' + error.message)
-    toast('Guardado en el registro sombra')
-    const { data } = await supabase.from('sombra')
-      .select('*').order('creado_en', { ascending: false }).limit(50)
-    setRegistros(data || [])
+    toast(`${lista.length} estimaciones guardadas`)
+    setRespuesta(null)
+    recargar()
   }
 
   async function marcarSombra(id, acerto) {
-    const { error } = await supabase.from('sombra')
-      .update({ acerto_ia: acerto }).eq('id', id)
+    const actual = registros.find(r => r.id === id)?.acerto_ia
+    const nuevo = actual === acerto ? null : acerto
+    const { error } = await supabase.from('sombra').update({ acerto_ia: nuevo }).eq('id', id)
     if (error) return toast('No se pudo marcar')
-    setRegistros(rs => rs.map(r => (r.id === id ? { ...r, acerto_ia: acerto } : r)))
+    setRegistros(rs => rs.map(r => (r.id === id ? { ...r, acerto_ia: nuevo } : r)))
   }
+
+  async function borrarGrupo(clave) {
+    const ids = grupos.find(g => g.clave === clave)?.items.map(i => i.id) || []
+    const { error } = await supabase.from('sombra').delete().in('id', ids)
+    if (error) return toast('No se pudo borrar')
+    toast('Análisis borrado')
+    recargar()
+  }
+
+  // agrupar por partido + fecha
+  const grupos = Object.values(
+    registros.reduce((acc, r) => {
+      const fecha = String(r.creado_en).slice(0, 10)
+      const clave = `${r.partido}__${fecha}`
+      if (!acc[clave]) acc[clave] = {
+        clave, partido: r.partido, competicion: r.competicion,
+        fecha, confianza: r.confianza, razonamiento: r.razonamiento, items: []
+      }
+      acc[clave].items.push(r)
+      return acc
+    }, {})
+  )
 
   const resueltas = registros.filter(r => r.acerto_ia !== null && r.acerto_ia !== undefined)
   const aciertos = resueltas.filter(r => r.acerto_ia).length
   const probMedia = resueltas.length
-    ? resueltas.reduce((a, r) => a + Number(r.prob_ia || 0), 0) / resueltas.length
-    : null
+    ? resueltas.reduce((a, r) => a + Number(r.prob_ia || 0), 0) / resueltas.length : null
   const tasaReal = resueltas.length ? aciertos / resueltas.length : null
 
   return (
@@ -113,8 +159,7 @@ export default function Analisis({ toast }) {
           <div className="flag">
             <strong>Qué es esto.</strong> Si sumas las probabilidades de todas las opciones
             de un mercado, debería dar 100%. Siempre da más: ese exceso es la comisión de la
-            casa y sale de tu bolsillo antes de que ruede el balón. No es una estimación:
-            es aritmética sobre las cuotas publicadas.
+            casa y sale de tu bolsillo antes de que ruede el balón.
           </div>
 
           <div className="card">
@@ -132,8 +177,7 @@ export default function Analisis({ toast }) {
             <div className="card" key={i}>
               <div className="merc-head">
                 <span className="merc-n">Mercado {i + 1}</span>
-                {mercados.length > 1 &&
-                  <button className="x" onClick={() => delMercado(i)}>×</button>}
+                {mercados.length > 1 && <button className="x" onClick={() => delMercado(i)}>×</button>}
               </div>
               <div className="field">
                 <label htmlFor={`mn${i}`}>Nombre</label>
@@ -147,17 +191,11 @@ export default function Analisis({ toast }) {
                   <div className="cuota-item" key={j}>
                     <input inputMode="decimal" value={c} aria-label={`Cuota ${j + 1}`}
                            onChange={e => upCuota(i, j, e.target.value)} placeholder="1.85" />
-                    {m.cuotas.length > 2 &&
-                      <button className="x" onClick={() => delCuota(i, j)}>×</button>}
+                    {m.cuotas.length > 2 && <button className="x" onClick={() => delCuota(i, j)}>×</button>}
                   </div>
                 ))}
               </div>
               <button className="mini" onClick={() => addCuota(i)}>+ Otra opción</button>
-              <p className="ayuda">
-                Tienen que ser <strong>todas</strong> las opciones del mercado: las tres del
-                1X2, el más y el menos de un total, el sí y el no de ambos marcan. Con una sola
-                cuota no se puede calcular nada.
-              </p>
             </div>
           ))}
 
@@ -212,8 +250,7 @@ export default function Analisis({ toast }) {
               </table>
               <p className="ayuda">
                 La columna «real» es lo que el mercado cree de verdad, quitando la comisión.
-                Para tener ventaja, tu propia estimación tiene que superar ese número, no el
-                de la cuota.
+                Para tener ventaja, tu estimación tiene que superar ese número, no el de la cuota.
               </p>
             </div>
           )}
@@ -224,23 +261,14 @@ export default function Analisis({ toast }) {
             <strong>Esto no es un generador de picks.</strong> El modelo estima probabilidades
             <em> sin ver las cuotas</em>, para que no se ancle en ellas. Tú guardas su
             estimación y sigues apostando por tu criterio. Dentro de 50 partidos sabrás si
-            acertaba más que el mercado o no. Hasta entonces no le des ningún peso.
+            acertaba más que el mercado o no.
           </div>
 
           {resueltas.length > 0 && (
             <div className="figs">
-              <div className="fig">
-                <div className="k">Predicciones resueltas</div>
-                <div className="v">{resueltas.length}</div>
-              </div>
-              <div className="fig">
-                <div className="k">Acertó</div>
-                <div className="v">{pct(tasaReal)}</div>
-              </div>
-              <div className="fig">
-                <div className="k">Decía que acertaría</div>
-                <div className="v">{pct(probMedia)}</div>
-              </div>
+              <div className="fig"><div className="k">Resueltas</div><div className="v">{resueltas.length}</div></div>
+              <div className="fig"><div className="k">Acertó</div><div className="v">{pct(tasaReal)}</div></div>
+              <div className="fig"><div className="k">Decía acertar</div><div className="v">{pct(probMedia)}</div></div>
               <div className="fig">
                 <div className="k">Desviación</div>
                 <div className={`v ${tasaReal - probMedia < -0.05 ? 'neg' : ''}`}>
@@ -253,26 +281,32 @@ export default function Analisis({ toast }) {
           {resueltas.length >= 20 && (
             <div className="verdict">
               {Math.abs(tasaReal - probMedia) < 0.05
-                ? 'Las estimaciones van bien calibradas: acierta más o menos lo que dice que acertará. Eso todavía no significa que le gane al mercado.'
+                ? 'Bien calibrado: acierta más o menos lo que dice. Eso aún no significa que le gane al mercado.'
                 : tasaReal < probMedia
-                  ? 'Está sobreestimando: dice acertar más de lo que acierta. Es el fallo típico de estos análisis.'
-                  : 'Está infraestimando: acierta más de lo que anuncia.'}
+                  ? 'Sobreestima: dice acertar más de lo que acierta. Es el fallo típico.'
+                  : 'Infraestima: acierta más de lo que anuncia.'}
               {resueltas.length < 50 && ' Aún faltan predicciones para concluir.'}
             </div>
           )}
 
           <div className="card">
-            <div className="row c2">
+            <div className="enfrenta">
               <div className="field">
-                <label htmlFor="pa">Partido</label>
-                <input id="pa" value={partido} onChange={e => setPartido(e.target.value)}
-                       placeholder="Celtic vs LASK" />
+                <label htmlFor="loc-s">Local</label>
+                <AutoInput id="loc-s" value={local} opciones={equipos}
+                           onChange={setLocal} placeholder="Marsella" />
               </div>
+              <span className="vs" aria-hidden="true">vs</span>
               <div className="field">
-                <label htmlFor="co">Competición</label>
-                <input id="co" value={competicion} onChange={e => setCompeticion(e.target.value)}
-                       placeholder="Champions League" />
+                <label htmlFor="vis-s">Visitante</label>
+                <AutoInput id="vis-s" value={visitante} opciones={equipos}
+                           onChange={setVisitante} placeholder="Strasbourg" />
               </div>
+            </div>
+            <div className="field">
+              <label htmlFor="co">Competición</label>
+              <input id="co" value={competicion} onChange={e => setCompeticion(e.target.value)}
+                     placeholder="Ligue 1" />
             </div>
             <button className="act" onClick={pedirAnalisis} disabled={pidiendo}>
               {pidiendo ? 'Buscando información…' : 'Pedir estimación'}
@@ -293,11 +327,6 @@ export default function Analisis({ toast }) {
                     </div>
                     <span className="odd">{pct(m.probabilidad)}</span>
                   </div>
-                  <div style={{ marginTop: 8 }}>
-                    <button className="tiny" onClick={() => guardarSombra(m)}>
-                      Guardar en sombra
-                    </button>
-                  </div>
                 </div>
               ))}
 
@@ -307,29 +336,76 @@ export default function Analisis({ toast }) {
                 </div>
               )}
               {respuesta.crudo && <p className="ayuda">{respuesta.crudo}</p>}
+
+              <div className="row c2" style={{ marginTop: 14 }}>
+                <button className="act" onClick={guardarTodo}>Guardar todo en sombra</button>
+                <button className="ghost" onClick={() => setRespuesta(null)}>Descartar</button>
+              </div>
             </div>
           )}
 
-          {registros.length > 0 && (
+          {grupos.length > 0 && (
             <>
-              <span className="eyebrow">Registro sombra</span>
-              {registros.map(r => (
-                <div className="card" key={r.id} style={{ marginBottom: 10 }}>
-                  <div className="sel-row">
-                    <div className="sel-txt">
-                      <b>{r.partido}</b>
-                      <em>{r.mercado_ia} · decía {pct(Number(r.prob_ia))}</em>
-                    </div>
-                    <span className="odd">{String(r.creado_en).slice(0, 10)}</span>
-                  </div>
-                  <div className="marks">
-                    <button className={`tiny win ${r.acerto_ia === true ? 'on' : ''}`}
-                            onClick={() => marcarSombra(r.id, true)}>✓ acertó</button>
-                    <button className={`tiny lose ${r.acerto_ia === false ? 'on' : ''}`}
-                            onClick={() => marcarSombra(r.id, false)}>✗ falló</button>
-                  </div>
-                </div>
-              ))}
+              <div className="sec-label" style={{ marginTop: 22 }}>
+                <span className="eyebrow">Archivo de análisis</span>
+                <span className="contador">{grupos.length}</span>
+              </div>
+
+              {grupos.map(g => {
+                const hechas = g.items.filter(i => i.acerto_ia !== null && i.acerto_ia !== undefined).length
+                const ok = g.items.filter(i => i.acerto_ia === true).length
+                const ab = abierto === g.clave
+                return (
+                  <article className={`bet ${hechas === g.items.length ? 'ganada' : 'pendiente'}`}
+                           key={g.clave}>
+                    <button className="bet-cabecera" onClick={() => setAbierto(ab ? null : g.clave)}
+                            aria-expanded={ab}>
+                      <div className="bet-izq">
+                        <div className="bet-meta">
+                          <span>{g.fecha}</span>
+                          {g.competicion && <><span className="sep">·</span><span>{g.competicion}</span></>}
+                        </div>
+                        <div className="sel-txt" style={{ marginTop: 3 }}><b>{g.partido}</b></div>
+                        <div className="bet-sub">
+                          {g.items.length} mercados
+                          {hechas > 0 && <> <span className="sep">·</span> {ok}/{hechas} acertados</>}
+                          {g.confianza != null && <> <span className="sep">·</span> confianza {g.confianza}</>}
+                        </div>
+                      </div>
+                      <div className="bet-der">
+                        <span className="chevron" aria-hidden="true">{ab ? '−' : '+'}</span>
+                      </div>
+                    </button>
+
+                    {ab && (
+                      <div className="bet-cuerpo">
+                        {g.razonamiento && (
+                          <p className="razonamiento">{g.razonamiento}</p>
+                        )}
+                        {g.items.map(r => (
+                          <div className="sel" key={r.id}>
+                            <div className="sel-row">
+                              <div className="sel-txt">{r.mercado_ia}</div>
+                              <span className="odd">{pct(Number(r.prob_ia))}</span>
+                            </div>
+                            <div className="marks">
+                              <button className={`tiny win ${r.acerto_ia === true ? 'on' : ''}`}
+                                      onClick={() => marcarSombra(r.id, true)}>✓</button>
+                              <button className={`tiny lose ${r.acerto_ia === false ? 'on' : ''}`}
+                                      onClick={() => marcarSombra(r.id, false)}>✗</button>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="bet-pie">
+                          <button className="tiny" onClick={() => borrarGrupo(g.clave)}>
+                            Borrar análisis
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
             </>
           )}
         </>
