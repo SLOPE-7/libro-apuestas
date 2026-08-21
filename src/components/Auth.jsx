@@ -38,7 +38,7 @@ export default function Auth() {
 
   return (
     <div className="center">
-      <h1 style={{ marginBottom: 6 }}>Libro de apuestas</h1>
+      <h1 style={{ marginBottom: 6 }}>KAL Analiza y Registra</h1>
       <p className="lede">
         Tus datos quedan atados a tu cuenta y se sincronizan entre teléfono y computadora.
       </p>
