@@ -64,7 +64,7 @@ export default function App() {
   return (
     <div className="wrap">
       <header className="app">
-        <h1>Libro de apuestas</h1>
+        <h1>KAL Analiza y Registra</h1>
         <span className="folio">
           {apuestas.length
             ? `${apuestas.length} asiento${apuestas.length > 1 ? 's' : ''}`
