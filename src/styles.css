@@ -505,3 +505,44 @@ button.mini:hover{color:var(--ink)}
 }
 nav button{font-size:10.5px;letter-spacing:.08em}
 
+
+/* mercados dentro de una selección */
+.submercados{list-style:none;margin:9px 0 0;padding:0}
+
+.sub{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:7px 0;
+  border-top:1px solid var(--rule);
+}
+.sub:first-child{border-top:0}
+
+.sub-btn{
+  flex-shrink:0;
+  width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--card-2);
+  border:1px solid var(--rule-2);border-radius:var(--r);
+  cursor:pointer;color:var(--ink-faint);
+  font:500 15px/1 "IBM Plex Mono",monospace;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.sub-btn:active{transform:scale(.94)}
+.sub-btn.win {background:var(--gain);color:#fff;border-color:var(--gain)}
+.sub-btn.lose{background:var(--loss);color:#fff;border-color:var(--loss)}
+.sub-btn.void{background:var(--ink-soft);color:#fff;border-color:var(--ink-soft)}
+
+.sub-txt{
+  font-size:13.5px;line-height:1.35;color:var(--ink-2);
+  padding-top:8px;
+}
+.sub-ganada  .sub-txt{color:var(--ink-faint);text-decoration:line-through}
+.sub-anulada .sub-txt{color:var(--ink-faint);font-style:italic}
+.sub-perdida .sub-txt{color:var(--loss);font-weight:600}
+
+.sel-perdida{background:var(--loss-fondo);margin:0 -8px;padding-left:8px;padding-right:8px}
+.sel-ganada .sel-txt b{color:var(--gain)}
+
+.sel-mercado{
+  display:block;font-style:normal;font-size:12.5px;
+  color:var(--ink-soft);margin-top:3px;
+}
