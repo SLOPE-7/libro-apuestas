@@ -8,6 +8,21 @@ const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v || 0).toFixed(2)
 
 const mercadoVacio = () => ({ nombre: '', cuotas: ['', ''] })
 
+const MERCADOS_BASE = [
+  '1X2 - gana el local', 'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
+]
+
+const SUGERIDOS = [
+  'Más de 1.5 goles', 'Más de 2.5 goles', 'Más de 3.5 goles',
+  'Menos de 2.5 goles', 'Ambos equipos marcan',
+  '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
+  'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
+  'Más de 8.5 córners', 'Más de 9.5 córners', 'Más de 10.5 córners',
+  'Menos de 9.5 córners', 'Menos de 10.5 córners',
+  'Más de 3.5 tarjetas', 'Más de 4.5 tarjetas', 'Menos de 4.5 tarjetas',
+  'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
+]
+
 export default function Analisis({ toast }) {
   const [vista, setVista] = useState('margen')
 
@@ -38,34 +53,20 @@ export default function Analisis({ toast }) {
   const [local, setLocal] = useState('')
   const [visitante, setVisitante] = useState('')
   const [competicion, setCompeticion] = useState('')
-    const MERCADOS_BASE = [
-    '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
-    'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
-  ]
-  const SUGERIDOS = [
-    'Más de 1.5 goles', 'Más de 2.5 goles', 'Más de 3.5 goles',
-    'Menos de 2.5 goles', 'Ambos equipos marcan',
-    '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
-    'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
-    'Más de 8.5 córners', 'Más de 9.5 córners', 'Más de 10.5 córners',
-    'Menos de 9.5 córners', 'Menos de 10.5 córners',
-    'Más de 3.5 tarjetas', 'Más de 4.5 tarjetas', 'Menos de 4.5 tarjetas',
-    'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
-  ]
   const [mercadosPedidos, setMercadosPedidos] = useState(MERCADOS_BASE)
   const [nuevoMercado, setNuevoMercado] = useState('')
+  const [pidiendo, setPidiendo] = useState(false)
+  const [respuesta, setRespuesta] = useState(null)
+  const [abierto, setAbierto] = useState(null)
 
   const alternarMercado = m =>
-    setMercadosPedidos(l => l.includes(m) ? l.filter(x => x !== m) : [...l, m])
-  const añadirMercado = () => {
+    setMercadosPedidos(l => (l.includes(m) ? l.filter(x => x !== m) : [...l, m]))
+
+  const anadirMercado = () => {
     const t = nuevoMercado.trim()
     if (t && !mercadosPedidos.includes(t)) setMercadosPedidos(l => [...l, t])
     setNuevoMercado('')
   }
-
-  const [pidiendo, setPidiendo] = useState(false)
-  const [respuesta, setRespuesta] = useState(null)
-  const [abierto, setAbierto] = useState(null)
 
   const partido = [local.trim(), visitante.trim()].filter(Boolean).join(' vs ')
 
@@ -88,12 +89,17 @@ export default function Analisis({ toast }) {
 
   async function pedirAnalisis() {
     if (!partido) return toast('Escribe los dos equipos')
+    if (!mercadosPedidos.length) return toast('Elige al menos un mercado')
     setPidiendo(true); setRespuesta(null)
     try {
       const r = await fetch('/api/analizar', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ partido, competicion: competicion.trim() })
+        body: JSON.stringify({
+          partido,
+          competicion: competicion.trim(),
+          mercados: mercadosPedidos
+        })
       })
       const data = await r.json()
       setPidiendo(false)
@@ -140,7 +146,6 @@ export default function Analisis({ toast }) {
     recargar()
   }
 
-  // agrupar por partido + fecha
   const grupos = Object.values(
     registros.reduce((acc, r) => {
       const fecha = String(r.creado_en).slice(0, 10)
@@ -328,11 +333,48 @@ export default function Analisis({ toast }) {
                            onChange={setVisitante} placeholder="Strasbourg" />
               </div>
             </div>
+
             <div className="field">
               <label htmlFor="co">Competición</label>
               <input id="co" value={competicion} onChange={e => setCompeticion(e.target.value)}
                      placeholder="Ligue 1" />
             </div>
+
+            <div className="field">
+              <label>Mercados a estimar · {mercadosPedidos.length}</label>
+              <div className="chips">
+                {SUGERIDOS.map(m => (
+                  <button key={m}
+                          className={`chip ${mercadosPedidos.includes(m) ? 'on' : ''}`}
+                          onClick={() => alternarMercado(m)}>{m}</button>
+                ))}
+              </div>
+
+              {mercadosPedidos.filter(m => !SUGERIDOS.includes(m)).length > 0 && (
+                <div className="chips" style={{ marginTop: 6 }}>
+                  {mercadosPedidos.filter(m => !SUGERIDOS.includes(m)).map(m => (
+                    <button key={m} className="chip on" onClick={() => alternarMercado(m)}>
+                      {m} ×
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="row c2" style={{ marginTop: 10 }}>
+                <input value={nuevoMercado} onChange={e => setNuevoMercado(e.target.value)}
+                       placeholder="otro mercado…" />
+                <button className="ghost" onClick={anadirMercado}>Añadir</button>
+              </div>
+
+              <p className="ayuda">
+                Elige solo los que de verdad estabas considerando apostar. Si pides las tres
+                opciones del 1X2, una acierta por fuerza y el registro sombra queda inflado.
+                Entre 4 y 8 mercados funciona mejor que veinte. En córners y sobre todo en
+                tarjetas espera confianzas bajas: dependen del árbitro y ese dato casi nunca
+                se publica antes.
+              </p>
+            </div>
+
             <button className="act" onClick={pedirAnalisis} disabled={pidiendo}>
               {pidiendo ? 'Buscando información…' : 'Pedir estimación'}
             </button>
@@ -404,9 +446,7 @@ export default function Analisis({ toast }) {
 
                     {ab && (
                       <div className="bet-cuerpo">
-                        {g.razonamiento && (
-                          <p className="razonamiento">{g.razonamiento}</p>
-                        )}
+                        {g.razonamiento && <p className="razonamiento">{g.razonamiento}</p>}
                         {g.items.map(r => (
                           <div className="sel" key={r.id}>
                             <div className="sel-row">
