@@ -553,4 +553,79 @@ nav button{font-size:10.5px;letter-spacing:.08em}
   border-bottom:1px solid var(--rule);
   margin-bottom:4px;
 }
+/* ── selector de línea estilo casa de apuestas ──────────────── */
+.linea{
+  background:var(--card-2);
+  border-radius:var(--r);
+  padding:14px;
+  margin-bottom:10px;
+}
+.linea-top{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:12px;
+}
+.linea-titulo{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.linea-lados{display:flex;gap:1px;background:var(--rule-2);border:1px solid var(--rule-2)}
+.linea-lados button{
+  background:#fff;border:0;cursor:pointer;padding:6px 14px;color:var(--ink-soft);
+  font:600 11px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.1em;text-transform:uppercase;
+}
+.linea-lados button.on{background:var(--ink);color:var(--paper-2)}
+
+.linea-valor{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.linea-num{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:28px;font-weight:600;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;line-height:1;
+}
+.linea-txt{font-size:12.5px;color:var(--ink-soft)}
+
+.linea-slider{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:28px;background:none;padding:0;border:0;
+  cursor:pointer;
+}
+.linea-slider:focus{outline:0;box-shadow:none}
+.linea-slider::-webkit-slider-runnable-track{
+  height:4px;background:var(--rule-2);border-radius:2px;
+}
+.linea-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:26px;height:26px;margin-top:-11px;
+  background:var(--ink);border:3px solid var(--card);border-radius:50%;
+  box-shadow:0 1px 3px rgba(28,34,38,.3);
+}
+.linea-slider::-moz-range-track{height:4px;background:var(--rule-2);border-radius:2px}
+.linea-slider::-moz-range-thumb{
+  width:22px;height:22px;background:var(--ink);
+  border:3px solid var(--card);border-radius:50%;
+}
+
+.linea-extremos{
+  display:flex;justify-content:space-between;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-faint);
+  margin-top:-4px;margin-bottom:10px;
+}
+
+.linea-add{
+  width:100%;padding:10px;
+  background:#fff;border:1px solid var(--rule-2);border-radius:var(--r);
+  cursor:pointer;color:var(--ink-2);
+  font:600 11px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.08em;text-transform:uppercase;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.linea-add.on{background:var(--gain);color:#fff;border-color:var(--gain)}
+
+.elegidos{
+  background:var(--paper-2);border:1px solid var(--rule-2);border-radius:var(--r);
+  padding:12px;margin:12px 0;
+}
+.elegidos .chips{margin-top:8px}
+
 
