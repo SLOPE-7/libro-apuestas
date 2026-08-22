@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { comparar, costeMargen } from '../lib/margen'
 import AutoInput from './AutoInput'
+import LineaMercado from './LineaMercado'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v || 0).toFixed(2)
@@ -12,16 +13,21 @@ const MERCADOS_BASE = [
   '1X2 - gana el local', 'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
 ]
 
-const SUGERIDOS = [
-  'Más de 1.5 goles', 'Más de 2.5 goles', 'Más de 3.5 goles',
-  'Menos de 2.5 goles', 'Ambos equipos marcan',
+const DISCRETOS = [
   '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
   'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
-  'Más de 8.5 córners', 'Más de 9.5 córners', 'Más de 10.5 córners',
-  'Menos de 9.5 córners', 'Menos de 10.5 córners',
-  'Más de 3.5 tarjetas', 'Más de 4.5 tarjetas', 'Menos de 4.5 tarjetas',
+  'Ambos equipos marcan',
   'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
 ]
+
+const L_GOLES_MAS   = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+const L_GOLES_MENOS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+
+const L_CORNERS_MAS   = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]
+const L_CORNERS_MENOS = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5]
+
+const L_TARJETAS_MAS   = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+const L_TARJETAS_MENOS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
 
 export default function Analisis({ toast }) {
   const [vista, setVista] = useState('margen')
@@ -342,29 +348,48 @@ export default function Analisis({ toast }) {
 
             <div className="field">
               <label>Mercados a estimar · {mercadosPedidos.length}</label>
+
+              <LineaMercado titulo="Goles" unidad="goles"
+                            lineasMas={L_GOLES_MAS} lineasMenos={L_GOLES_MENOS}
+                            puestos={mercadosPedidos} onAlternar={alternarMercado} />
+
+              <LineaMercado titulo="Córners" unidad="córners"
+                            lineasMas={L_CORNERS_MAS} lineasMenos={L_CORNERS_MENOS}
+                            puestos={mercadosPedidos} onAlternar={alternarMercado} />
+
+              <LineaMercado titulo="Tarjetas" unidad="tarjetas"
+                            lineasMas={L_TARJETAS_MAS} lineasMenos={L_TARJETAS_MENOS}
+                            puestos={mercadosPedidos} onAlternar={alternarMercado} />
+
+              <span className="eyebrow" style={{ display: 'block', margin: '14px 0 7px' }}>
+                Resultado y otros
+              </span>
               <div className="chips">
-                {SUGERIDOS.map(m => (
+                {DISCRETOS.map(m => (
                   <button key={m}
                           className={`chip ${mercadosPedidos.includes(m) ? 'on' : ''}`}
                           onClick={() => alternarMercado(m)}>{m}</button>
                 ))}
               </div>
 
-              {mercadosPedidos.filter(m => !SUGERIDOS.includes(m)).length > 0 && (
-                <div className="chips" style={{ marginTop: 6 }}>
-                  {mercadosPedidos.filter(m => !SUGERIDOS.includes(m)).map(m => (
-                    <button key={m} className="chip on" onClick={() => alternarMercado(m)}>
-                      {m} ×
-                    </button>
-                  ))}
-                </div>
-              )}
-
               <div className="row c2" style={{ marginTop: 10 }}>
                 <input value={nuevoMercado} onChange={e => setNuevoMercado(e.target.value)}
                        placeholder="otro mercado…" />
                 <button className="ghost" onClick={anadirMercado}>Añadir</button>
               </div>
+
+              {mercadosPedidos.length > 0 && (
+                <div className="elegidos">
+                  <span className="eyebrow">Se estimarán estos {mercadosPedidos.length}</span>
+                  <div className="chips">
+                    {mercadosPedidos.map(m => (
+                      <button key={m} className="chip on" onClick={() => alternarMercado(m)}>
+                        {m} ×
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <p className="ayuda">
                 Elige solo los que de verdad estabas considerando apostar. Si pides las tres
