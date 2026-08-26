@@ -5,7 +5,6 @@ import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
 import CampoLento from './CampoLento'
 
-
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v || 0).toFixed(2)
 
@@ -153,7 +152,6 @@ export default function Analisis({ toast }) {
     setRegistros(rs => rs.map(r => (r.id === id ? { ...r, cuota_ia: v } : r)))
   }
 
-  
   async function borrarGrupo(clave) {
     const ids = grupos.find(g => g.clave === clave)?.items.map(i => i.id) || []
     const { error } = await supabase.from('sombra').delete().in('id', ids)
@@ -180,6 +178,14 @@ export default function Analisis({ toast }) {
   const probMedia = resueltas.length
     ? resueltas.reduce((a, r) => a + Number(r.prob_ia || 0), 0) / resueltas.length : null
   const tasaReal = resueltas.length ? aciertos / resueltas.length : null
+
+  /* Lo que habrías ganado o perdido apostando una unidad a cada estimación.
+     Es lo único que responde si el modelo sirve: acertar mucho en cuotas
+     bajas pierde dinero, y acertar poco en cuotas altas lo gana. */
+  const conCuota = resueltas.filter(r => Number(r.cuota_ia) > 1)
+  const retorno = conCuota.reduce(
+    (s, r) => s + (r.acerto_ia ? Number(r.cuota_ia) - 1 : -1), 0)
+  const yieldSombra = conCuota.length ? retorno / conCuota.length : null
 
   return (
     <section>
@@ -324,14 +330,39 @@ export default function Analisis({ toast }) {
             </div>
           )}
 
+          {conCuota.length > 0 && (
+            <div className="figs">
+              <div className="fig">
+                <div className="k">Con cuota anotada</div>
+                <div className="v">{conCuota.length}</div>
+              </div>
+              <div className="fig">
+                <div className="k">Yield si lo siguieras</div>
+                <div className={`v ${yieldSombra < 0 ? 'neg' : yieldSombra > 0 ? 'pos' : ''}`}>
+                  {pct(yieldSombra)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {conCuota.length >= 30 && (
+            <div className="verdict">
+              {yieldSombra > 0.02
+                ? 'Yield positivo: siguiendo estas estimaciones habrías ganado dinero. Es la única señal que cuenta, pero necesita muchas más apuestas para ser fiable.'
+                : yieldSombra > -0.02
+                  ? 'Yield cerca de cero: el modelo va a la par del mercado. No aporta ventaja, pero tampoco la destruye.'
+                  : 'Yield negativo: siguiendo estas estimaciones habrías perdido dinero, por mucho que el porcentaje de acierto parezca alto.'}
+            </div>
+          )}
+
           {resueltas.length >= 20 && (
             <div className="verdict">
               {Math.abs(tasaReal - probMedia) < 0.05
-                ? 'Bien calibrado: acierta más o menos lo que dice. Eso aún no significa que le gane al mercado.'
+                ? 'Bien calibrado: acierta más o menos lo que dice.'
                 : tasaReal < probMedia
-                  ? 'Sobreestima: dice acertar más de lo que acierta. Es el fallo típico.'
+                  ? 'Sobreestima: dice acertar más de lo que acierta.'
                   : 'Infraestima: acierta más de lo que anuncia.'}
-              {resueltas.length < 50 && ' Aún faltan predicciones para concluir.'}
+              {' '}Ojo: acertar mucho no significa ganar dinero. Anota las cuotas y mira el yield.
             </div>
           )}
 
@@ -488,11 +519,17 @@ export default function Analisis({ toast }) {
                               <div className="sel-txt">{r.mercado_ia}</div>
                               <span className="odd">{pct(Number(r.prob_ia))}</span>
                             </div>
-                            <div className="marks">
-                              <button className={`tiny win ${r.acerto_ia === true ? 'on' : ''}`}
-                                      onClick={() => marcarSombra(r.id, true)}>✓</button>
-                              <button className={`tiny lose ${r.acerto_ia === false ? 'on' : ''}`}
-                                      onClick={() => marcarSombra(r.id, false)}>✗</button>
+                            <div className="row c2" style={{ marginTop: 8, marginBottom: 8 }}>
+                              <CampoLento id={`cu-${r.id}`} etiqueta="Cuota que daba la casa"
+                                          valor={r.cuota_ia ?? ''} inputMode="decimal"
+                                          placeholder="1.85"
+                                          onGuardar={v => guardarCuota(r.id, v)} />
+                              <div className="marks" style={{ alignSelf: 'end', marginBottom: 4 }}>
+                                <button className={`tiny win ${r.acerto_ia === true ? 'on' : ''}`}
+                                        onClick={() => marcarSombra(r.id, true)}>✓</button>
+                                <button className={`tiny lose ${r.acerto_ia === false ? 'on' : ''}`}
+                                        onClick={() => marcarSombra(r.id, false)}>✗</button>
+                              </div>
                             </div>
                           </div>
                         ))}
