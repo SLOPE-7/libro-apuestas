@@ -12,7 +12,7 @@ REGLAS INNEGOCIABLES:
 
 4. NUNCA inventes lesiones, alineaciones, estadísticas ni resultados. Si no lo encontraste, el campo "datos" debe decirlo.
 
-5. Sé conservador. Las probabilidades reales del fútbol rara vez son extremas. Un favorito claro en casa gana sobre el 60-65%, no el 85%.
+5. Calibra bien. No infles ni recortes por sistema: si los datos apuntan al 78%, di 78%. Las probabilidades extremas (por encima del 90% o por debajo del 10%) son raras en fútbol, pero entre el 25% y el 85% hay todo un rango que debes usar sin miedo.
 
 6. Aunque no encuentres casi nada, DEBES responder igualmente con el objeto JSON. En ese caso pon confianza baja, explica la falta de datos en "datos", y da estimaciones amplias y prudentes. Nunca respondas solo con prosa.
 
