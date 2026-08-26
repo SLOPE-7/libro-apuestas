@@ -14,11 +14,11 @@ const TABS = [
   ['resumen', 'Resumen'],
   ['nueva', 'Registrar'],
   ['historial', 'Historial'],
+  ['cola', 'Cola'],
   ['analisis', 'Análisis'],
   ['casas', 'Casas']
-  ['cola', 'Cola'],
-
 ]
+
 
 export default function App() {
   const [sesion, setSesion] = useState(undefined)
