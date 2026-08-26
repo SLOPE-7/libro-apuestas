@@ -71,26 +71,70 @@ export function multiplicador(s) {
   }
 }
 
-export function resultado(apuesta) {
-  const sel = apuesta.selecciones || []
-  const stake = Number(apuesta.stake) || 0
+export function resumen(apuestas = [], casas = [], movimientos = []) {
+  const conEstado = apuestas.map(a => ({ ...a, _e: estadoApuesta(a), _r: resultado(a) }))
+  const resueltas = conEstado.filter(a => a._e !== 'pendiente')
+  const ganadas = resueltas.filter(a => a._r > 0)
+  const apostado = resueltas.reduce((s, a) => s + Number(a.stake), 0)
+  const neto = conEstado.reduce((s, a) => s + a._r, 0)
+  const inicial = casas.reduce((s, c) => s + Number(c.saldo_inicial || 0), 0)
 
-  // cierre anticipado: manda lo que devolvió la casa
-  if (apuesta.cash_out !== null && apuesta.cash_out !== undefined && apuesta.cash_out !== '')
-    return Number(apuesta.cash_out) - stake
+  // depósitos suman, retiros restan
+  const movNeto = movimientos.reduce(
+    (s, m) => s + (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0), 0)
+  const depositado = movimientos
+    .filter(m => m.tipo === 'deposito').reduce((s, m) => s + Number(m.monto), 0)
+  const retirado = movimientos
+    .filter(m => m.tipo === 'retiro').reduce((s, m) => s + Number(m.monto), 0)
 
-  if (estado(sel) === 'pendiente') return 0
-  const producto = sel.reduce((a, s) => a * multiplicador(s), 1)
-  if (producto === 0) return -stake
+  const clvs = apuestas
+    .flatMap(a => a.selecciones || [])
+    .map(s => clv(Number(s.cuota), Number(s.cuota_cierre)))
+    .filter(v => v !== null)
 
-  // Si anotaste la cuota de la casa, se ajusta al total real del boleto
-  const bruto = cuotaTotal(sel)
-  const ajuste = Number(apuesta.cuota_total) > 1 && bruto > 0
-    ? Number(apuesta.cuota_total) / bruto
-    : 1
+  const porTipo = esParlay => {
+    const g = resueltas.filter(a => ((a.selecciones || []).length > 1) === esParlay)
+    return {
+      n: g.length,
+      neto: g.reduce((s, a) => s + a._r, 0),
+      acierto: g.length ? g.filter(a => a._r > 0).length / g.length : null
+    }
+  }
 
-  return stake * (producto * ajuste - 1)
+  return {
+    inicial,
+    banca: inicial + movNeto + neto,
+    neto,
+    depositado,
+    retirado,
+    apostado,
+    resueltas: resueltas.length,
+    pendientes: conEstado.length - resueltas.length,
+    acierto: resueltas.length ? ganadas.length / resueltas.length : null,
+    yield: apostado ? neto / apostado : null,
+    clvMedio: clvs.length ? clvs.reduce((a, b) => a + b, 0) / clvs.length : null,
+    clvPositivo: clvs.length ? clvs.filter(v => v > 0).length / clvs.length : null,
+    clvN: clvs.length,
+    simples: porTipo(false),
+    parlays: porTipo(true),
+    porCasa: casas.map(c => {
+      const n = conEstado.filter(a => a.casa_id === c.id).reduce((s, a) => s + a._r, 0)
+      const mv = movimientos.filter(m => m.casa_id === c.id).reduce(
+        (s, m) => s + (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0), 0)
+      return { ...c, neto: n, movimientos: mv, saldo: Number(c.saldo_inicial || 0) + mv + n }
+    }),
+    curva: conEstado
+      .filter(a => a._e !== 'pendiente')
+      .slice()
+      .sort((a, b) => (a.fecha < b.fecha ? -1 : 1))
+      .reduce((acc, a, i) => {
+        const prev = i ? acc[i - 1].banca : inicial
+        acc.push({ i: i + 1, fecha: a.fecha, banca: prev + a._r })
+        return acc
+      }, [])
+  }
 }
+
 
 /**
  * Valor razonable de un cierre anticipado.
