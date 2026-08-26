@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import { comparar, costeMargen } from '../lib/margen'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
+import CampoLento from './CampoLento'
+
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v || 0).toFixed(2)
@@ -144,6 +146,14 @@ export default function Analisis({ toast }) {
     setRegistros(rs => rs.map(r => (r.id === id ? { ...r, acerto_ia: nuevo } : r)))
   }
 
+  async function guardarCuota(id, valor) {
+    const v = Number(valor) > 1 ? Number(valor) : null
+    const { error } = await supabase.from('sombra').update({ cuota_ia: v }).eq('id', id)
+    if (error) return toast('No se pudo guardar la cuota')
+    setRegistros(rs => rs.map(r => (r.id === id ? { ...r, cuota_ia: v } : r)))
+  }
+
+  
   async function borrarGrupo(clave) {
     const ids = grupos.find(g => g.clave === clave)?.items.map(i => i.id) || []
     const { error } = await supabase.from('sombra').delete().in('id', ids)
