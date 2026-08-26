@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
+import CampoLento from './CampoLento'
+
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
@@ -198,12 +200,10 @@ export default function Cola({ toast }) {
   }
 
   const campo = (it, k, etiqueta, extra = {}) => (
-    <div className="field">
-      <label htmlFor={`${k}-${it.id}`}>{etiqueta}</label>
-      <input id={`${k}-${it.id}`} defaultValue={it[k] ?? ''} {...extra}
-             onBlur={e => guardarCampo(it.id, k, e.target.value)} />
-    </div>
+    <CampoLento id={`${k}-${it.id}`} etiqueta={etiqueta} valor={it[k] ?? ''}
+                onGuardar={v => guardarCampo(it.id, k, v)} {...extra} />
   )
+
 
   return (
     <section>
@@ -229,13 +229,23 @@ export default function Cola({ toast }) {
                        onChange={v => setNuevo(n => ({ ...n, visitante: v }))} placeholder="LASK" />
           </div>
         </div>
-        <div className="row c2">
-          <div className="field">
-            <label htmlFor="n-comp">Competición</label>
-            <input id="n-comp" value={nuevo.competicion}
-                   onChange={e => setNuevo(n => ({ ...n, competicion: e.target.value }))}
-                   placeholder="Champions League" />
-          </div>
+                                <div className="row c2">
+                          <CampoLento id={`am-${it.id}`} etiqueta="Media amarillas"
+                                      valor={it.arb_amarillas ?? ''} inputMode="decimal"
+                                      placeholder="5.48"
+                                      onGuardar={v => {
+                                        guardarCampo(it.id, 'arb_amarillas', v)
+                                        recordarArbitro(it.arbitro, v, it.arb_rojas)
+                                      }} />
+                          <CampoLento id={`ro-${it.id}`} etiqueta="Media rojas"
+                                      valor={it.arb_rojas ?? ''} inputMode="decimal"
+                                      placeholder="0.39"
+                                      onGuardar={v => {
+                                        guardarCampo(it.id, 'arb_rojas', v)
+                                        recordarArbitro(it.arbitro, it.arb_amarillas, v)
+                                      }} />
+                        </div>
+
           <div className="field">
             <label htmlFor="n-hora">Hora</label>
             <input id="n-hora" value={nuevo.hora}
