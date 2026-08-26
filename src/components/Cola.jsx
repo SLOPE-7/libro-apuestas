@@ -12,11 +12,11 @@ const DISCRETOS = [
   'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
 ]
 
-const L_GOLES    = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+const L_GOLES         = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
 const L_CORNERS_MAS   = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]
 const L_CORNERS_MENOS = [...L_CORNERS_MAS, 15.5, 16.5]
-const L_TARJ_MAS   = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
-const L_TARJ_MENOS = [...L_TARJ_MAS, 7.5]
+const L_TARJ_MAS      = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+const L_TARJ_MENOS    = [...L_TARJ_MAS, 7.5]
 
 const ESTADO_TXT = {
   pendiente: 'Sin analizar', analizando: 'Analizando…',
@@ -26,6 +26,7 @@ const ESTADO_TXT = {
 export default function Cola({ toast }) {
   const [items, setItems] = useState([])
   const [equipos, setEquipos] = useState([])
+  const [arbitros, setArbitros] = useState([])
   const [abierto, setAbierto] = useState(null)
   const [extras, setExtras] = useState({})
   const [seleccion, setSeleccion] = useState([])
@@ -48,8 +49,15 @@ export default function Cola({ toast }) {
     setItems(data || [])
   }
 
+  async function recargarArbitros() {
+    const { data } = await supabase.from('arbitros')
+      .select('*').order('visto_en', { ascending: false })
+    setArbitros(data || [])
+  }
+
   useEffect(() => {
     recargar()
+    recargarArbitros()
     supabase.from('selecciones').select('partido').limit(600).then(({ data }) => {
       if (!data) return
       setEquipos([...new Set(
@@ -94,6 +102,31 @@ export default function Cola({ toast }) {
 
   const alternarSeleccion = id =>
     setSeleccion(s => (s.includes(id) ? s.filter(x => x !== id) : s.length >= 5 ? s : [...s, id]))
+
+  /* ── memoria de árbitros ── */
+  async function recordarArbitro(nombre, amarillas, rojas) {
+    const n = (nombre || '').trim()
+    if (!n) return
+    const { error } = await supabase.from('arbitros').upsert({
+      nombre: n,
+      amarillas: amarillas === '' || amarillas == null ? null : Number(amarillas),
+      rojas: rojas === '' || rojas == null ? null : Number(rojas),
+      visto_en: new Date().toISOString()
+    }, { onConflict: 'user_id,nombre' })
+    if (!error) recargarArbitros()
+  }
+
+  async function elegirArbitro(it, nombre) {
+    const a = arbitros.find(x => x.nombre === nombre)
+    const cambios = {
+      arbitro: nombre,
+      ...(a ? { arb_amarillas: a.amarillas, arb_rojas: a.rojas } : {})
+    }
+    const { error } = await supabase.from('cola').update(cambios).eq('id', it.id)
+    if (error) return toast('No se pudo guardar')
+    setItems(l => l.map(x => (x.id === it.id ? { ...x, ...cambios } : x)))
+    if (a) toast(`${nombre}: ${a.amarillas ?? '—'} amarillas de media`)
+  }
 
   /* ── la cola: uno detrás de otro, nunca en paralelo ── */
   async function analizarSeleccion() {
@@ -182,7 +215,6 @@ export default function Cola({ toast }) {
         </p>
       </header>
 
-      {/* añadir */}
       <div className="card">
         <div className="enfrenta">
           <div className="field">
@@ -242,7 +274,6 @@ export default function Cola({ toast }) {
         <button className="act" onClick={anadir}>+ Añadir a la cola</button>
       </div>
 
-      {/* progreso */}
       {progreso && (
         <div className="progreso">
           <b>{progreso.n} de {progreso.total}</b> · analizando {progreso.partido}
@@ -325,10 +356,34 @@ export default function Cola({ toast }) {
 
                     {ex && (
                       <div style={{ marginTop: 12 }}>
-                        {campo(it, 'arbitro', 'Árbitro')}
+                        <div className="field">
+                          <label>Árbitro</label>
+                          <AutoInput value={it.arbitro ?? ''}
+                                     opciones={arbitros.map(a => a.nombre)}
+                                     onChange={v => elegirArbitro(it, v)}
+                                     placeholder="Mateo Busquets Ferrer" />
+                        </div>
                         <div className="row c2">
-                          {campo(it, 'arb_amarillas', 'Media amarillas', { inputMode: 'decimal', placeholder: '5.48' })}
-                          {campo(it, 'arb_rojas', 'Media rojas', { inputMode: 'decimal', placeholder: '0.39' })}
+                          <div className="field">
+                            <label htmlFor={`am-${it.id}`}>Media amarillas</label>
+                            <input id={`am-${it.id}`} inputMode="decimal" placeholder="5.48"
+                                   defaultValue={it.arb_amarillas ?? ''}
+                                   key={`am-${it.id}-${it.arb_amarillas}`}
+                                   onBlur={e => {
+                                     guardarCampo(it.id, 'arb_amarillas', e.target.value)
+                                     recordarArbitro(it.arbitro, e.target.value, it.arb_rojas)
+                                   }} />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`ro-${it.id}`}>Media rojas</label>
+                            <input id={`ro-${it.id}`} inputMode="decimal" placeholder="0.39"
+                                   defaultValue={it.arb_rojas ?? ''}
+                                   key={`ro-${it.id}-${it.arb_rojas}`}
+                                   onBlur={e => {
+                                     guardarCampo(it.id, 'arb_rojas', e.target.value)
+                                     recordarArbitro(it.arbitro, it.arb_amarillas, e.target.value)
+                                   }} />
+                          </div>
                         </div>
                         <div className="row c2">
                           {campo(it, 'prev_corners', 'Córners previstos', { inputMode: 'decimal', placeholder: '9' })}
@@ -345,9 +400,10 @@ export default function Cola({ toast }) {
                         {campo(it, 'bajas', 'Bajas conocidas')}
                         {campo(it, 'notas', 'Notas')}
                         <p className="ayuda">
-                          Todo opcional. El árbitro y su media de amarillas son lo que más
-                          cambia las estimaciones de tarjetas: sin ese dato son adivinanzas.
-                          Los campos se guardan al salir de cada casilla.
+                          Todo opcional. Los árbitros se recuerdan: la próxima vez que
+                          escribas uno ya conocido, sus medias se rellenan solas. El árbitro
+                          y su media de amarillas son lo que más cambia las estimaciones de
+                          tarjetas. Los campos se guardan al salir de cada casilla.
                         </p>
                       </div>
                     )}
