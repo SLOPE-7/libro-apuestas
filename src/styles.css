@@ -629,3 +629,47 @@ nav button{font-size:10.5px;letter-spacing:.08em}
 .elegidos .chips{margin-top:8px}
 
 
+/* ── cola de partidos ───────────────────────────────────────── */
+.cola-item{
+  background:var(--card);
+  box-shadow:var(--sh);border-radius:var(--r);
+  border-left:4px solid var(--rule-hard);
+  margin-bottom:10px;overflow:hidden;
+}
+.cola-item.listo{border-left-color:var(--gain)}
+.cola-item.analizando{border-left-color:var(--caution)}
+.cola-item.error{border-left-color:var(--loss)}
+
+.cola-cab{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+  width:100%;padding:13px;background:none;border:0;cursor:pointer;
+  text-align:left;font-family:inherit;color:inherit;
+}
+.cola-cab:hover{background:var(--card-2)}
+.cola-nom{font-size:14.5px;font-weight:600;line-height:1.3}
+.cola-meta{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);
+  margin-top:3px;
+}
+.cola-cuerpo{padding:0 13px 13px;border-top:1px solid var(--rule)}
+
+.extras-toggle{
+  width:100%;padding:9px;margin-top:10px;
+  background:var(--card-2);border:1px dashed var(--rule-2);border-radius:var(--r);
+  cursor:pointer;color:var(--ink-soft);
+  font:600 10.5px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.1em;text-transform:uppercase;
+}
+
+.progreso{
+  background:var(--ink);color:var(--paper-2);
+  border-radius:var(--r);padding:14px;margin:14px 0;
+  font-size:13.5px;line-height:1.5;
+}
+.progreso b{color:#fff}
+.progreso-barra{
+  height:4px;background:rgba(242,241,235,.25);border-radius:2px;
+  margin-top:10px;overflow:hidden;
+}
+.progreso-relleno{height:100%;background:var(--paper-2);transition:width .3s}
