@@ -5,10 +5,9 @@ import Auth from './components/Auth'
 import Resumen from './components/Resumen'
 import NuevaApuesta from './components/NuevaApuesta'
 import Historial from './components/Historial'
-import Casas from './components/Casas'
-import Analisis from './components/Analisis'
 import Cola from './components/Cola'
-
+import Analisis from './components/Analisis'
+import Casas from './components/Casas'
 
 const TABS = [
   ['resumen', 'Resumen'],
@@ -19,10 +18,10 @@ const TABS = [
   ['casas', 'Casas']
 ]
 
-
 export default function App() {
   const [sesion, setSesion] = useState(undefined)
   const [casas, setCasas] = useState([])
+  const [movimientos, setMovimientos] = useState([])
   const [apuestas, setApuestas] = useState([])
   const [tab, setTab] = useState('resumen')
   const [aviso, setAviso] = useState('')
@@ -39,17 +38,17 @@ export default function App() {
   const cargar = useCallback(async () => {
     if (!sesion) return
     setCargando(true)
-    const [{ data: c, error: ec }, { data: a, error: ea }] = await Promise.all([
+    const [{ data: c, error: ec }, { data: a, error: ea }, { data: mv }] = await Promise.all([
       supabase.from('casas').select('*').order('creado_en'),
-      supabase
-        .from('apuestas')
-        .select('*, selecciones(*)')
+      supabase.from('apuestas').select('*, selecciones(*)')
         .order('fecha', { ascending: false })
-        .order('creado_en', { ascending: false })
+        .order('creado_en', { ascending: false }),
+      supabase.from('movimientos').select('*').order('fecha', { ascending: false })
     ])
     setCargando(false)
     if (ec || ea) return toast('No se pudieron cargar los datos')
     setCasas(c ?? [])
+    setMovimientos(mv ?? [])
     setApuestas(
       (a ?? []).map(x => ({
         ...x,
@@ -63,7 +62,7 @@ export default function App() {
   if (sesion === undefined) return <div className="center">Cargando…</div>
   if (!sesion) return <Auth />
 
-  const r = resumen(apuestas, casas)
+  const r = resumen(apuestas, casas, movimientos)
 
   return (
     <div className="wrap">
@@ -90,20 +89,18 @@ export default function App() {
         : <>
             {tab === 'resumen' && <Resumen r={r} />}
             {tab === 'nueva' && (
-              <NuevaApuesta
-                casas={casas}
-                banca={r.banca}
-                toast={toast}
-                onGuardado={() => { cargar(); setTab('historial') }}
-              />
+              <NuevaApuesta casas={casas} banca={r.banca} toast={toast}
+                            onGuardado={() => { cargar(); setTab('historial') }} />
             )}
             {tab === 'historial' && (
               <Historial apuestas={apuestas} casas={casas} onCambio={cargar} toast={toast} />
             )}
-            {tab === 'analisis' && <Analisis toast={toast} />}
-            {tab === 'casas' && <Casas casas={casas} onCambio={cargar} toast={toast} />}
             {tab === 'cola' && <Cola toast={toast} />}
-
+            {tab === 'analisis' && <Analisis toast={toast} />}
+            {tab === 'casas' && (
+              <Casas casas={casas} movimientos={movimientos} resumen={r}
+                     onCambio={cargar} toast={toast} />
+            )}
           </>}
 
       {aviso && <div className="toast">{aviso}</div>}
