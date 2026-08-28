@@ -214,7 +214,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <label htmlFor="cupon">Pega aquí el texto del cupón</label>
             <textarea id="cupon" rows={7} value={cupon}
                       onChange={e => setCupon(e.target.value)}
-                      placeholder={'Equipo A FC vs. Equipo B\nApuesta sin empate: 1   Cuotas: 1.25\n…'} />
+                      placeholder={'Equipo A vs. Equipo B\nApuesta sin empate: 1   Cuotas: 1.25\n…'} />
           </div>
           <p className="ayuda">
             En la casa, abre el cupón, selecciona el texto y cópialo. No sirve una captura
@@ -275,7 +275,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
               <div className="field">
                 <label htmlFor={`loc${i}`}>Local</label>
                 <AutoInput id={`loc${i}`} value={l.local} opciones={histEquipos}
-                           onChange={v => up(i, 'local', v)} placeholder="Equipo A />
+                           onChange={v => up(i, 'local', v)} placeholder="Equipo A" />
               </div>
               <span className="vs" aria-hidden="true">vs</span>
               <div className="field">
