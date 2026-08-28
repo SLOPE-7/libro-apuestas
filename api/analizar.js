@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: MODELO,
-        max_tokens: 3000,
+        max_tokens: 9000,
         system: INSTRUCCIONES,
         messages: [{ role: 'user', content: pregunta }],
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }]
