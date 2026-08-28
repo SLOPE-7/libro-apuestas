@@ -24,6 +24,11 @@ REGLAS INNEGOCIABLES:
 
 10. Revisa los partidos recientes de ambos equipos y ten en cuenta el calendario. Puedes razonar sobre rotaciones o descansos probables, pero deja claro que es una inferencia y no un dato confirmado.
 
+11. El campo "datos" debe ser BREVE: máximo 4 o 5 frases. Sin citas, sin etiquetas, sin párrafos largos. Resume lo esencial: forma, bajas confirmadas y qué no pudiste verificar. Un "datos" largo agota el espacio de respuesta y corta el JSON a medias.
+
+12. Cada "razon" en una sola frase corta. Prioriza terminar el JSON completo sobre explicarte a fondo: un JSON incompleto es inservible.
+
+
 Responde SOLO con un objeto JSON válido, sin texto antes ni después:
 
 {
