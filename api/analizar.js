@@ -20,9 +20,9 @@ REGLAS INNEGOCIABLES:
 
 8. Al final, si detectas que alguno de los mercados pedidos es arriesgado dada la información disponible, señálalo en "sugerencias": qué mercado del mismo partido tendría más probabilidad de cumplirse. Ejemplo: si le piden "gana el local" y el local llega con bajas y en mala forma, sugiere la doble oportunidad. NO digas cuál tiene más "valor": sin ver las cuotas no puedes saberlo, y lo más probable casi siempre está peor pagado.
 
-9. Si los mercados seleccionados por el usuario tienen riesgo, le daras otros mercados, o revisaras cual es el fuerte del equipo y le daras su mejor estadistica.
+9. Si los mercados que pide el usuario tienen riesgo, ofrécele alternativas y señala en qué destaca de verdad cada equipo según sus estadísticas.
 
-10. Si el equipo tiene partidos recientes, tendras que revisarlos, y estimar sin inventar sus posibles rotaciones o descansos.
+10. Revisa los partidos recientes de ambos equipos y ten en cuenta el calendario. Puedes razonar sobre rotaciones o descansos probables, pero deja claro que es una inferencia y no un dato confirmado.
 
 Responde SOLO con un objeto JSON válido, sin texto antes ni después:
 
@@ -36,7 +36,7 @@ Responde SOLO con un objeto JSON válido, sin texto antes ni después:
     {"en_lugar_de": "mercado pedido", "considera": "mercado alternativo", "porque": "una frase"}
   ],
   "aviso": "el riesgo principal de este análisis"
-}
+}`
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' })
@@ -61,26 +61,32 @@ export default async function handler(req, res) {
   // Solo se envían los datos que el usuario haya rellenado
   const extras = []
   if (arbitro) {
-    let a = `Árbitro: ${arbitro}`
-    if (arbAmarillas) a += ` · media de amarillas por partido: ${arbAmarillas}`
-    if (arbRojas) a += ` · media de rojas: ${arbRojas}`
+    let a = 'Árbitro: ' + arbitro
+    if (arbAmarillas) a += ' · media de amarillas por partido: ' + arbAmarillas
+    if (arbRojas) a += ' · media de rojas: ' + arbRojas
     extras.push(a)
   }
-  if (fase) extras.push(`Fase: ${fase}${resultadoIda ? ` · resultado de la ida: ${resultadoIda}` : ''}`)
-  if (posLocal) extras.push(`Posición del local en la tabla: ${posLocal}`)
-  if (posVisitante) extras.push(`Posición del visitante en la tabla: ${posVisitante}`)
-  if (prevCorners) extras.push(`Córners esperados en el partido (previsión Sofascore): ${prevCorners}`)
-  if (prevTarjetas) extras.push(`Tarjetas amarillas esperadas en el partido (previsión Sofascore): ${prevTarjetas}`)
-  if (bajas) extras.push(`Bajas conocidas: ${bajas}`)
-  if (notas) extras.push(`Notas del usuario: ${notas}`)
+  if (fase) extras.push('Fase: ' + fase + (resultadoIda ? ' · resultado de la ida: ' + resultadoIda : ''))
+  if (posLocal) extras.push('Posición del local en la tabla: ' + posLocal)
+  if (posVisitante) extras.push('Posición del visitante en la tabla: ' + posVisitante)
+  if (prevCorners) extras.push('Córners esperados en el partido (previsión Sofascore): ' + prevCorners)
+  if (prevTarjetas) extras.push('Tarjetas amarillas esperadas en el partido (previsión Sofascore): ' + prevTarjetas)
+  if (bajas) extras.push('Bajas conocidas: ' + bajas)
+  if (notas) extras.push('Notas del usuario: ' + notas)
 
-  const pregunta = `Partido: ${partido}
-${competicion ? `Competición: ${competicion}` : ''}
-${fecha ? `Fecha: ${fecha}` : ''}
-${extras.length ? `\nDATOS APORTADOS POR EL USUARIO (verificados, úsalos como base):\n- ${extras.join('\n- ')}` : ''}
+  const partes = ['Partido: ' + partido]
+  if (competicion) partes.push('Competición: ' + competicion)
+  if (fecha) partes.push('Fecha: ' + fecha)
+  if (extras.length) {
+    partes.push('')
+    partes.push('DATOS APORTADOS POR EL USUARIO (verificados, úsalos como base):')
+    partes.push('- ' + extras.join('\n- '))
+  }
+  partes.push('')
+  partes.push('Estima la probabilidad de cada uno de estos mercados:')
+  partes.push('- ' + lista)
 
-Estima la probabilidad de cada uno de estos mercados:
-- ${lista}`
+  const pregunta = partes.join('\n')
 
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
