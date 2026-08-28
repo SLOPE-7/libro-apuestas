@@ -17,14 +17,20 @@ const MERCADOS_BASE = [
 const DISCRETOS = [
   '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
   'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
-  'Ambos equipos marcan',
-  'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
+  'Ambos equipos marcan', 'Local ganacualquier mitad', 'Visitante gana cualquier mitad'
+  'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad', 'Primera mitad 1X',
+  'Menos de 1.5 goles en la primera mitad', 'Más de 2.5 goles en la primera mitad',
+  'Más de 0.5 goles', 'Más de 1.5 goles', 'Más de 2.5 goles',
+  'Primera mitad 2X', 'Local más de 0.5 goles', 'Visitante más de 0.5 goles', 
+  'Local Hándicap +0', 'Local Hándicap +0.5', 'Local Hándicap +1', 'Local Hándicap +1.5', 'Local Hándicap +2', 'Local Hándicap +2.5',
+  'Visitante Hándicap +0', 'Visitante Hándicap +0.5', 'Visitante Hándicap +1', 'Visitante Hándicap +1.5', 'Visitante Hándicap +2', 'Visitante Hándicap +2.5',
+  'Se Calsifica Local', 'Se Calsifica Visistante',
 ]
 
 const L_GOLES_MAS   = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
 const L_GOLES_MENOS = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
 
-const L_CORNERS_MAS   = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]
+const L_CORNERS_MAS   = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5]
 const L_CORNERS_MENOS = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5]
 
 const L_TARJETAS_MAS   = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
@@ -463,6 +469,23 @@ export default function Analisis({ toast }) {
                 </div>
               ))}
 
+              {respuesta.sugerencias?.length > 0 && (
+                <div className="flag" style={{ marginTop: 12 }}>
+                  <strong>Mercados alternativos.</strong>
+                  <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                    {respuesta.sugerencias.map((s, i) => (
+                      <li key={i} style={{ marginBottom: 5 }}>
+                        En lugar de <b>{s.en_lugar_de}</b>, considera <b>{s.considera}</b> — {s.porque}
+                      </li>
+                    ))}
+                  </ul>
+                  <p style={{ marginTop: 8, fontSize: 12 }}>
+                    Más probable no significa mejor apuesta: lo que más se cumple suele
+                    estar peor pagado. Mira la cuota antes.
+                  </p>
+                </div>
+              )}
+
               {respuesta.aviso && (
                 <div className="flag" style={{ marginTop: 12 }}>
                   <strong>Riesgo del análisis.</strong> {respuesta.aviso}
@@ -477,7 +500,7 @@ export default function Analisis({ toast }) {
             </div>
           )}
 
-                   {grupos.length > 0 && (
+          {grupos.length > 0 && (
             <>
               <div className="sec-label" style={{ marginTop: 22 }}>
                 <span className="eyebrow">Archivo de análisis</span>
@@ -544,6 +567,8 @@ export default function Analisis({ toast }) {
               })}
             </>
           )}
+        </>
+      )}
     </section>
   )
 }
