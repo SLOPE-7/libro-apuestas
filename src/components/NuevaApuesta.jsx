@@ -159,12 +159,13 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   async function guardar() {
     const s = Number(stake)
     const validas = legs.filter(l => nombre(l) && Number(l.cuota) > 1)
+    if (!casaId)         return toast('Elige la casa antes de guardar')
     if (!(s > 0))        return toast('Falta el monto apostado')
     if (!validas.length) return toast('Falta al menos un partido con su cuota')
 
     setGuardando(true)
     const { data: apuesta, error: e1 } = await supabase.from('apuestas')
-      .insert({ fecha, casa_id: casaId || null, stake: s, cuota_total: manual > 1 ? manual : null })
+      .insert({ fecha, casa_id: casaId, stake: s, cuota_total: manual > 1 ? manual : null })
       .select().single()
     if (e1) { setGuardando(false); return toast('No se pudo guardar: ' + e1.message) }
 
@@ -246,11 +247,11 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
           <div className="field">
             <label htmlFor="casa">Casa</label>
             <select id="casa" value={casaId} onChange={e => elegirCasa(e.target.value)}>
+              <option value="">— elige casa —</option>
               {casas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </div>
         </div>
-    
       </div>
 
       <div className="sec-label">
@@ -274,7 +275,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
               <div className="field">
                 <label htmlFor={`loc${i}`}>Local</label>
                 <AutoInput id={`loc${i}`} value={l.local} opciones={histEquipos}
-                           onChange={v => up(i, 'local', v)} placeholder="Equipo A" />
+                           onChange={v => up(i, 'local', v)} placeholder="Equipo A />
               </div>
               <span className="vs" aria-hidden="true">vs</span>
               <div className="field">
@@ -378,65 +379,4 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
       )}
 
       {repetido && (
-        <div className="flag">
-          <strong>Has puesto el mismo partido dos veces.</strong> Si son mercados del mismo
-          encuentro, van juntos con «+ Otro mercado en este partido»: los resultados están
-          correlacionados y tratarlos como independientes infla la probabilidad real.
-        </div>
-      )}
-
-      <div className="medidor">
-        {sel.length === 0 ? (
-          <p className="medidor-vacio">
-            Escribe las cuotas y aquí verás la probabilidad de que <strong>todo</strong> se cumpla.
-          </p>
-        ) : (
-          <>
-            <div className="medidor-top">
-              <span className="eyebrow">Probabilidad combinada</span>
-              <span className="medidor-pct">{(prob * 100).toFixed(1)}<i>%</i></span>
-            </div>
-            <div className="bars">
-              {acum.map((v, i) => (
-                <div className="bar" key={i} style={{ height: `${Math.max(v * 100, 2)}%` }}>
-                  <span>{i + 1}</span>
-                </div>
-              ))}
-            </div>
-            <p className="medidor-nota">
-              {sel.length === 1
-                ? <>Apuesta simple. Cuota <b>{totalReal.toFixed(2)}</b>.</>
-                : <><b>{sel.length} partidos.</b> Cuota total <b>{totalReal.toFixed(2)}</b>.
-                    Fallar uno solo lo pierde todo, y cada partido extra suma el margen
-                    de la casa otra vez.</>}
-              {desvia && <> El producto de las cuotas daría {producto.toFixed(2)}.</>}
-            </p>
-          </>
-        )}
-      </div>
-
-      {f && (
-        <div className="flag">
-          <strong>{f.ok ? 'Pasa los filtros.' : 'No pasa los filtros.'}</strong> {f.texto}
-          {f.ok && banca > 0 &&
-            <> · Stake sugerido (¼ Kelly): <strong>L{(banca * k).toFixed(2)}</strong></>}
-        </div>
-      )}
-
-   <div className="field">
-          <label htmlFor="stake">Monto apostado</label>
-          <div className="con-sufijo">
-            <input id="stake" inputMode="decimal" value={stake}
-                   onChange={e => setStake(e.target.value)} placeholder="0.00" />
-            <span className="sufijo">L</span>
-          </div>
-        </div>
-      
-      <button className="act" onClick={guardar} disabled={guardando}>
-        {guardando ? 'Guardando…' : 'Guardar en el libro'}
-      </button>
-    </section>
-
-    
-  )
-}
+        <div
