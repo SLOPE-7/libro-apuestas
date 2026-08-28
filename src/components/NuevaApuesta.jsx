@@ -379,4 +379,71 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
       )}
 
       {repetido && (
-        <div
+        <div className="flag">
+          <strong>Has puesto el mismo partido dos veces.</strong> Si son mercados del mismo
+          encuentro, van juntos con «+ Otro mercado en este partido»: los resultados están
+          correlacionados y tratarlos como independientes infla la probabilidad real.
+        </div>
+      )}
+
+      <div className="medidor">
+        {sel.length === 0 ? (
+          <p className="medidor-vacio">
+            Escribe las cuotas y aquí verás la probabilidad de que <strong>todo</strong> se cumpla.
+          </p>
+        ) : (
+          <>
+            <div className="medidor-top">
+              <span className="eyebrow">Probabilidad combinada</span>
+              <span className="medidor-pct">{(prob * 100).toFixed(1)}<i>%</i></span>
+            </div>
+            <div className="bars">
+              {acum.map((v, i) => (
+                <div className="bar" key={i} style={{ height: `${Math.max(v * 100, 2)}%` }}>
+                  <span>{i + 1}</span>
+                </div>
+              ))}
+            </div>
+            <p className="medidor-nota">
+              {sel.length === 1
+                ? <>Apuesta simple. Cuota <b>{totalReal.toFixed(2)}</b>.</>
+                : <><b>{sel.length} partidos.</b> Cuota total <b>{totalReal.toFixed(2)}</b>.
+                    Fallar uno solo lo pierde todo, y cada partido extra suma el margen
+                    de la casa otra vez.</>}
+              {desvia && <> El producto de las cuotas daría {producto.toFixed(2)}.</>}
+            </p>
+          </>
+        )}
+      </div>
+
+      {f && (
+        <div className="flag">
+          <strong>{f.ok ? 'Pasa los filtros.' : 'No pasa los filtros.'}</strong> {f.texto}
+          {f.ok && banca > 0 &&
+            <> · Stake sugerido (¼ Kelly): <strong>L{(banca * k).toFixed(2)}</strong></>}
+        </div>
+      )}
+
+      <div className="card">
+        <div className="field">
+          <label htmlFor="stake">Monto apostado</label>
+          <div className="con-sufijo">
+            <input id="stake" inputMode="decimal" value={stake}
+                   onChange={e => setStake(e.target.value)} placeholder="0.00" />
+            <span className="sufijo">L</span>
+          </div>
+        </div>
+        {banca > 0 && Number(stake) > banca * 0.05 && (
+          <p className="ayuda" style={{ color: 'var(--loss)' }}>
+            Son {((Number(stake) / banca) * 100).toFixed(1)}% de tu banca. Por encima del 3%
+            una racha normal de derrotas te deja sin margen para seguir.
+          </p>
+        )}
+      </div>
+
+      <button className="act" onClick={guardar} disabled={guardando}>
+        {guardando ? 'Guardando…' : 'Guardar en el libro'}
+      </button>
+    </section>
+  )
+}
