@@ -213,7 +213,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <label htmlFor="cupon">Pega aquí el texto del cupón</label>
             <textarea id="cupon" rows={7} value={cupon}
                       onChange={e => setCupon(e.target.value)}
-                      placeholder={'Celtic FC vs. LASK\nApuesta sin empate: 1   Cuotas: 1.25\n…'} />
+                      placeholder={'Equipo A FC vs. Equipo B\nApuesta sin empate: 1   Cuotas: 1.25\n…'} />
           </div>
           <p className="ayuda">
             En la casa, abre el cupón, selecciona el texto y cópialo. No sirve una captura
