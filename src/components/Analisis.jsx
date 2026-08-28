@@ -371,20 +371,20 @@ export default function Analisis({ toast }) {
               <div className="field">
                 <label htmlFor="loc-s">Local</label>
                 <AutoInput id="loc-s" value={local} opciones={equipos}
-                           onChange={setLocal} placeholder="Marsella" />
+                           onChange={setLocal} placeholder="Equipo A" />
               </div>
               <span className="vs" aria-hidden="true">vs</span>
               <div className="field">
                 <label htmlFor="vis-s">Visitante</label>
                 <AutoInput id="vis-s" value={visitante} opciones={equipos}
-                           onChange={setVisitante} placeholder="Strasbourg" />
+                           onChange={setVisitante} placeholder="Equipo B" />
               </div>
             </div>
 
             <div className="field">
               <label htmlFor="co">Competición</label>
               <input id="co" value={competicion} onChange={e => setCompeticion(e.target.value)}
-                     placeholder="Ligue 1" />
+                     placeholder="Liga/Copa/Amistoso/UEFA" />
             </div>
 
             <div className="field">
