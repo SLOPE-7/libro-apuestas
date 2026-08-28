@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { permisoAvisos, pedirPermiso, programar, cancelar, cuantosProgramados } from '../lib/avisos'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
 import CampoLento from './CampoLento'
+
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
@@ -25,6 +27,7 @@ const ESTADO_TXT = {
 }
 
 export default function Cola({ toast }) {
+  const [permiso, setPermiso] = useState(permisoAvisos())
   const [items, setItems] = useState([])
   const [equipos, setEquipos] = useState([])
   const [arbitros, setArbitros] = useState([])
@@ -65,6 +68,18 @@ export default function Cola({ toast }) {
     setCompeticiones((data || []).map(c => c.nombre))
   }
 
+  // reprograma los avisos cada vez que cambia la cola
+  useEffect(() => {
+    if (permiso !== 'granted') return
+    items.forEach(it => {
+      if (it.fecha_partido && it.hora) {
+        programar(it.id, `${it.local} vs ${it.visitante}`, it.fecha_partido, it.hora)
+      } else {
+        cancelar(it.id)
+      }
+    })
+  }, [items, permiso])
+  
   useEffect(() => {
     recargar()
     recargarArbitros()
@@ -245,6 +260,28 @@ export default function Cola({ toast }) {
         </p>
       </header>
 
+      {permiso !== 'granted' && permiso !== 'no-soportado' && (
+        <div className="flag">
+          <strong>Avisos al empezar el partido.</strong> Puedo avisarte cuando arranque
+          cada partido con hora puesta.{' '}
+          <button className="mini" style={{ padding: 0 }}
+                  onClick={async () => setPermiso(await pedirPermiso())}>
+            Activar avisos
+          </button>
+          <br />
+          <span style={{ fontSize: 12 }}>
+            Solo funciona con la app abierta o en segundo plano. Si la cierras del
+            multitarea, el aviso no llega.
+          </span>
+        </div>
+      )}
+
+      {permiso === 'granted' && cuantosProgramados() > 0 && (
+        <div className="bet-sub" style={{ marginBottom: 12 }}>
+          {cuantosProgramados()} {cuantosProgramados() === 1 ? 'aviso programado' : 'avisos programados'}
+        </div>
+      )}
+      
       <div className="card">
         <div className="enfrenta">
           <div className="field">
