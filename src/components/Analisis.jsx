@@ -477,7 +477,7 @@ export default function Analisis({ toast }) {
             </div>
           )}
 
-          {grupos.length > 0 && (
+                   {grupos.length > 0 && (
             <>
               <div className="sec-label" style={{ marginTop: 22 }}>
                 <span className="eyebrow">Archivo de análisis</span>
@@ -487,22 +487,21 @@ export default function Analisis({ toast }) {
               {grupos.map(g => {
                 const hechas = g.items.filter(i => i.acerto_ia !== null && i.acerto_ia !== undefined).length
                 const ok = g.items.filter(i => i.acerto_ia === true).length
+                const completo = hechas === g.items.length
                 const ab = abierto === g.clave
                 return (
-                  <article className={`bet ${hechas === g.items.length ? 'ganada' : 'pendiente'}`}
+                  <article className={`bet compacta ${completo ? 'ganada' : 'pendiente'}`}
                            key={g.clave}>
                     <button className="bet-cabecera" onClick={() => setAbierto(ab ? null : g.clave)}
                             aria-expanded={ab}>
                       <div className="bet-izq">
+                        <div className="cola-nom">{g.partido}</div>
                         <div className="bet-meta">
-                          <span>{g.fecha}</span>
+                          <span>{g.fecha.slice(5)}</span>
                           {g.competicion && <><span className="sep">·</span><span>{g.competicion}</span></>}
-                        </div>
-                        <div className="sel-txt" style={{ marginTop: 3 }}><b>{g.partido}</b></div>
-                        <div className="bet-sub">
-                          {g.items.length} mercados
-                          {hechas > 0 && <> <span className="sep">·</span> {ok}/{hechas} acertados</>}
-                          {g.confianza != null && <> <span className="sep">·</span> confianza {g.confianza}</>}
+                          <span className="sep">·</span>
+                          <span>{g.items.length} merc</span>
+                          {hechas > 0 && <><span className="sep">·</span><span>{ok}/{hechas} ✓</span></>}
                         </div>
                       </div>
                       <div className="bet-der">
@@ -520,7 +519,7 @@ export default function Analisis({ toast }) {
                               <span className="odd">{pct(Number(r.prob_ia))}</span>
                             </div>
                             <div className="row c2" style={{ marginTop: 8, marginBottom: 8 }}>
-                              <CampoLento id={`cu-${r.id}`} etiqueta="Cuota que daba la casa"
+                              <CampoLento id={`cu-${r.id}`} etiqueta="Cuota de la casa"
                                           valor={r.cuota_ia ?? ''} inputMode="decimal"
                                           placeholder="1.85"
                                           onGuardar={v => guardarCuota(r.id, v)} />
@@ -545,8 +544,6 @@ export default function Analisis({ toast }) {
               })}
             </>
           )}
-        </>
-      )}
     </section>
   )
 }
