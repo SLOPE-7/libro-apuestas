@@ -12,7 +12,16 @@ const DISCRETOS = [
   '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
   'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
   'Ambos equipos marcan',
-  'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad'
+  'Local gana cualquier mitad', 'Visitante gana cualquier mitad',
+  'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad',
+  'Menos de 1.5 goles en la primera mitad', 'Más de 2.5 goles en la primera mitad',
+  'Primera mitad 1X', 'Primera mitad 2X',
+  'Local más de 0.5 goles', 'Visitante más de 0.5 goles',
+  'Local Hándicap +0', 'Local Hándicap +0.5', 'Local Hándicap +1',
+  'Local Hándicap +1.5', 'Local Hándicap +2', 'Local Hándicap +2.5',
+  'Visitante Hándicap +0', 'Visitante Hándicap +0.5', 'Visitante Hándicap +1',
+  'Visitante Hándicap +1.5', 'Visitante Hándicap +2', 'Visitante Hándicap +2.5',
+  'Se clasifica el local', 'Se clasifica el visitante'
 ]
 
 const L_GOLES         = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
