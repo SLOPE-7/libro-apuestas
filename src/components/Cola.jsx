@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { permisoAvisos, pedirPermiso, programar, cancelar, cuantosProgramados } from '../lib/avisos'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
 import CampoLento from './CampoLento'
-
+import { permisoAvisos, pedirPermiso, programar, cancelar, cuantosProgramados } from '../lib/avisos'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
+
+const MERCADOS_BASE = [
+  '1X2 - gana el local', 'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
+]
 
 const DISCRETOS = [
   '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
@@ -36,7 +39,6 @@ const ESTADO_TXT = {
 }
 
 export default function Cola({ toast }) {
-  const [permiso, setPermiso] = useState(permisoAvisos())
   const [items, setItems] = useState([])
   const [equipos, setEquipos] = useState([])
   const [arbitros, setArbitros] = useState([])
@@ -48,13 +50,12 @@ export default function Cola({ toast }) {
   const [seleccion, setSeleccion] = useState([])
   const [corriendo, setCorriendo] = useState(false)
   const [progreso, setProgreso] = useState(null)
+  const [permiso, setPermiso] = useState(permisoAvisos())
 
   const [nuevo, setNuevo] = useState({
     local: '', visitante: '', competicion: '', fecha_partido: '', hora: ''
   })
-  const [mercados, setMercados] = useState([
-    '1X2 - gana el local', 'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
-  ])
+  const [mercados, setMercados] = useState(MERCADOS_BASE)
 
   const alternarMercado = m =>
     setMercados(l => (l.includes(m) ? l.filter(x => x !== m) : [...l, m]))
@@ -77,18 +78,6 @@ export default function Cola({ toast }) {
     setCompeticiones((data || []).map(c => c.nombre))
   }
 
-  // reprograma los avisos cada vez que cambia la cola
-  useEffect(() => {
-    if (permiso !== 'granted') return
-    items.forEach(it => {
-      if (it.fecha_partido && it.hora) {
-        programar(it.id, `${it.local} vs ${it.visitante}`, it.fecha_partido, it.hora)
-      } else {
-        cancelar(it.id)
-      }
-    })
-  }, [items, permiso])
-  
   useEffect(() => {
     recargar()
     recargarArbitros()
@@ -101,6 +90,18 @@ export default function Cola({ toast }) {
       )].sort())
     })
   }, [])
+
+  // reprograma los avisos cada vez que cambia la cola
+  useEffect(() => {
+    if (permiso !== 'granted') return
+    items.forEach(it => {
+      if (it.fecha_partido && it.hora) {
+        programar(it.id, `${it.local} vs ${it.visitante}`, it.fecha_partido, it.hora)
+      } else {
+        cancelar(it.id)
+      }
+    })
+  }, [items, permiso])
 
   async function recordarCompeticion(nombre) {
     const n = (nombre || '').trim()
@@ -126,6 +127,8 @@ export default function Cola({ toast }) {
     if (error) return toast('No se pudo añadir: ' + error.message)
     recordarCompeticion(nuevo.competicion)
     setNuevo({ local: '', visitante: '', competicion: nuevo.competicion, fecha_partido: '', hora: '' })
+    // los mercados vuelven a los básicos: cada partido se elige aparte
+    setMercados(MERCADOS_BASE)
     toast('Añadido a la cola')
     recargar()
   }
@@ -141,6 +144,7 @@ export default function Cola({ toast }) {
   async function borrar(id) {
     const { error } = await supabase.from('cola').delete().eq('id', id)
     if (error) return toast('No se pudo borrar')
+    cancelar(id)
     setSeleccion(s => s.filter(x => x !== id))
     recargar()
   }
@@ -256,7 +260,7 @@ export default function Cola({ toast }) {
     }, {})
   ).map(g => ({
     ...g,
-    items: g.items.slice().sort((a, b) => (a.hora || '99') < (b.hora || '99') ? -1 : 1)
+    items: g.items.slice().sort((a, b) => ((a.hora || '99') < (b.hora || '99') ? -1 : 1))
   }))
 
   return (
@@ -279,8 +283,8 @@ export default function Cola({ toast }) {
           </button>
           <br />
           <span style={{ fontSize: 12 }}>
-            Solo funciona con la app abierta o en segundo plano. Si la cierras del
-            multitarea, el aviso no llega.
+            Solo funciona con la app abierta o en segundo plano, y desde el icono de la
+            pantalla de inicio. Si la cierras del multitarea, el aviso no llega.
           </span>
         </div>
       )}
@@ -290,7 +294,7 @@ export default function Cola({ toast }) {
           {cuantosProgramados()} {cuantosProgramados() === 1 ? 'aviso programado' : 'avisos programados'}
         </div>
       )}
-      
+
       <div className="card">
         <div className="enfrenta">
           <div className="field">
@@ -310,7 +314,7 @@ export default function Cola({ toast }) {
             <label htmlFor="n-comp">Competición</label>
             <AutoInput id="n-comp" value={nuevo.competicion} opciones={competiciones}
                        onChange={v => setNuevo(n => ({ ...n, competicion: v }))}
-                       placeholder="Liga/Copa/Amistoso/UEFA" />
+                       placeholder="Liga/Copa/UEFA" />
           </div>
           <div className="field">
             <label htmlFor="n-hora">Hora</label>
@@ -345,6 +349,19 @@ export default function Cola({ toast }) {
                       onClick={() => alternarMercado(m)}>{m}</button>
             ))}
           </div>
+
+          {mercados.length > 0 && (
+            <div className="elegidos">
+              <span className="eyebrow">Se estimarán estos {mercados.length}</span>
+              <div className="chips">
+                {mercados.map(m => (
+                  <button key={m} className="chip on" onClick={() => alternarMercado(m)}>
+                    {m} ×
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <button className="act" onClick={anadir}>+ Añadir a la cola</button>
@@ -490,7 +507,7 @@ export default function Cola({ toast }) {
                                   <label>Competición</label>
                                   <AutoInput value={it.competicion ?? ''} opciones={competiciones}
                                              onChange={v => guardarCampo(it.id, 'competicion', v)}
-                                             placeholder="Liga/Copa/Amistoso/UEFA" />
+                                             placeholder="Liga/Copa/UEFA" />
                                 </div>
                                 {campo(it, 'hora', 'Hora', { placeholder: '13:00' })}
                               </div>
@@ -504,7 +521,7 @@ export default function Cola({ toast }) {
                                 <AutoInput value={it.arbitro ?? ''}
                                            opciones={arbitros.map(a => a.nombre)}
                                            onChange={v => elegirArbitro(it, v)}
-                                           placeholder="Mateo Busquets Ferrer" />
+                                           placeholder="Nombre del árbitro" />
                               </div>
                               <div className="row c2">
                                 <CampoLento id={`am-${it.id}`} etiqueta="Media amarillas"
