@@ -673,3 +673,28 @@ nav button{font-size:10.5px;letter-spacing:.08em}
   margin-top:10px;overflow:hidden;
 }
 .progreso-relleno{height:100%;background:var(--paper-2);transition:width .3s}
+
+/* historial compacto y agrupado */
+.bet.compacta .bet-cabecera{padding:11px 13px}
+.bet.compacta .bet-meta{font-size:10px;gap:5px}
+.bet.compacta .bet-amt{font-size:16px}
+.bet.compacta{margin-bottom:7px}
+
+.grupo-cab{
+  display:flex;width:100%;align-items:center;justify-content:space-between;
+  padding:12px 14px;margin:10px 0 8px;cursor:pointer;
+  border:0;border-left:4px solid var(--rule-hard);border-radius:var(--r);
+  background:var(--card-2);font-family:inherit;color:inherit;
+}
+.grupo-cab.ganada  {border-left-color:var(--gain);   background:var(--gain-fondo)}
+.grupo-cab.perdida {border-left-color:var(--loss);   background:var(--loss-fondo)}
+.grupo-cab.cerrada {border-left-color:var(--cerrada);background:var(--cerrada-fondo)}
+.grupo-tit{
+  font:600 11.5px/1 "IBM Plex Sans Condensed",sans-serif;
+  letter-spacing:.12em;text-transform:uppercase;
+}
+.grupo-datos{
+  display:flex;align-items:center;gap:10px;
+  font-family:"IBM Plex Mono",monospace;font-size:13px;
+  font-variant-numeric:tabular-nums;
+}
