@@ -18,6 +18,12 @@ REGLAS INNEGOCIABLES:
 
 7. Aunque no encuentres casi nada, DEBES responder igualmente con el objeto JSON. En ese caso pon confianza baja y explica la falta de datos en "datos". Nunca respondas solo con prosa.
 
+8. Al final, si detectas que alguno de los mercados pedidos es arriesgado dada la información disponible, señálalo en "sugerencias": qué mercado del mismo partido tendría más probabilidad de cumplirse. Ejemplo: si le piden "gana el local" y el local llega con bajas y en mala forma, sugiere la doble oportunidad. NO digas cuál tiene más "valor": sin ver las cuotas no puedes saberlo, y lo más probable casi siempre está peor pagado.
+
+9. Si los mercados seleccionados por el usuario tienen riesgo, le daras otros mercados, o revisaras cual es el fuerte del equipo y le daras su mejor estadistica.
+
+10. Si el equipo tiene partidos recientes, tendras que revisarlos, y estimar sin inventar sus posibles rotaciones o descansos.
+
 Responde SOLO con un objeto JSON válido, sin texto antes ni después:
 
 {
@@ -26,8 +32,11 @@ Responde SOLO con un objeto JSON válido, sin texto antes ni después:
   "mercados": [
     {"mercado": "nombre del mercado", "probabilidad": 0.00-1.00, "razon": "una frase"}
   ],
+  "sugerencias": [
+    {"en_lugar_de": "mercado pedido", "considera": "mercado alternativo", "porque": "una frase"}
+  ],
   "aviso": "el riesgo principal de este análisis"
-}`
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' })
