@@ -274,13 +274,13 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
               <div className="field">
                 <label htmlFor={`loc${i}`}>Local</label>
                 <AutoInput id={`loc${i}`} value={l.local} opciones={histEquipos}
-                           onChange={v => up(i, 'local', v)} placeholder="Celtic" />
+                           onChange={v => up(i, 'local', v)} placeholder="Equipo A" />
               </div>
               <span className="vs" aria-hidden="true">vs</span>
               <div className="field">
                 <label htmlFor={`vis${i}`}>Visitante</label>
                 <AutoInput id={`vis${i}`} value={l.visitante} opciones={histEquipos}
-                           onChange={v => up(i, 'visitante', v)} placeholder="LASK" />
+                           onChange={v => up(i, 'visitante', v)} placeholder="Equipo B" />
               </div>
             </div>
 
