@@ -423,12 +423,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         </div>
       )}
 
-      <button className="act" onClick={guardar} disabled={guardando}>
-        {guardando ? 'Guardando…' : 'Guardar en el libro'}
-      </button>
-    </section>
-
-       <div className="field">
+   <div className="field">
           <label htmlFor="stake">Monto apostado</label>
           <div className="con-sufijo">
             <input id="stake" inputMode="decimal" value={stake}
@@ -436,5 +431,12 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <span className="sufijo">L</span>
           </div>
         </div>
+      
+      <button className="act" onClick={guardar} disabled={guardando}>
+        {guardando ? 'Guardando…' : 'Guardar en el libro'}
+      </button>
+    </section>
+
+    
   )
 }
