@@ -250,14 +250,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             </select>
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="stake">Monto apostado</label>
-          <div className="con-sufijo">
-            <input id="stake" inputMode="decimal" value={stake}
-                   onChange={e => setStake(e.target.value)} placeholder="0.00" />
-            <span className="sufijo">L</span>
-          </div>
-        </div>
+    
       </div>
 
       <div className="sec-label">
@@ -434,5 +427,14 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         {guardando ? 'Guardando…' : 'Guardar en el libro'}
       </button>
     </section>
+
+       <div className="field">
+          <label htmlFor="stake">Monto apostado</label>
+          <div className="con-sufijo">
+            <input id="stake" inputMode="decimal" value={stake}
+                   onChange={e => setStake(e.target.value)} placeholder="0.00" />
+            <span className="sufijo">L</span>
+          </div>
+        </div>
   )
 }
