@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
 import CampoLento from './CampoLento'
-import { permisoAvisos, pedirPermiso, programar, cancelar, cuantosProgramados } from '../lib/avisos'
+import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
@@ -38,6 +38,16 @@ const ESTADO_TXT = {
   listo: 'Listo', error: 'Error'
 }
 
+/** Momento de inicio del partido, o null si falta fecha u hora. */
+function inicioDe(it) {
+  if (!it.fecha_partido || !it.hora) return null
+  const [h, m] = String(it.hora).split(':').map(Number)
+  if (Number.isNaN(h)) return null
+  const d = new Date(`${it.fecha_partido}T00:00:00`)
+  d.setHours(h, m || 0, 0, 0)
+  return d
+}
+
 export default function Cola({ toast }) {
   const [items, setItems] = useState([])
   const [equipos, setEquipos] = useState([])
@@ -51,6 +61,7 @@ export default function Cola({ toast }) {
   const [corriendo, setCorriendo] = useState(false)
   const [progreso, setProgreso] = useState(null)
   const [permiso, setPermiso] = useState(permisoAvisos())
+  const [ahora, setAhora] = useState(Date.now())
 
   const [nuevo, setNuevo] = useState({
     local: '', visitante: '', competicion: '', fecha_partido: '', hora: ''
@@ -91,7 +102,16 @@ export default function Cola({ toast }) {
     })
   }, [])
 
-  // reprograma los avisos cada vez que cambia la cola
+  /* El reloj interno: refresca la lista de "ya empezaron" cada minuto
+     y también al volver a la app, que es cuando de verdad lo vas a mirar. */
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 60000)
+    const alVolver = () => { if (!document.hidden) { setAhora(Date.now()); recargar() } }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
+  }, [])
+
+  // los avisos del sistema solo saltan con la app viva; se programan igual
   useEffect(() => {
     if (permiso !== 'granted') return
     items.forEach(it => {
@@ -215,9 +235,10 @@ export default function Cola({ toast }) {
           .update({ estado, respuesta: data, analizado_en: new Date().toISOString() })
           .eq('id', it.id)
         setItems(l => l.map(x => (x.id === it.id ? { ...x, estado, respuesta: data } : x)))
-      } catch {
-        await supabase.from('cola').update({ estado: 'error' }).eq('id', it.id)
-        setItems(l => l.map(x => (x.id === it.id ? { ...x, estado: 'error' } : x)))
+      } catch (e) {
+        const data = { error: 'No se pudo conectar con el servidor', detalle: String(e).slice(0, 300) }
+        await supabase.from('cola').update({ estado: 'error', respuesta: data }).eq('id', it.id)
+        setItems(l => l.map(x => (x.id === it.id ? { ...x, estado: 'error', respuesta: data } : x)))
       }
     }
 
@@ -250,6 +271,12 @@ export default function Cola({ toast }) {
                 onGuardar={v => guardarCampo(it.id, k, v)} {...extra} />
   )
 
+  /* partidos cuya hora ya pasó */
+  const empezados = items.filter(it => {
+    const ini = inicioDe(it)
+    return ini && ini.getTime() <= ahora
+  })
+
   /* agrupar por competición, y dentro por hora */
   const grupos = Object.values(
     items.reduce((acc, it) => {
@@ -273,25 +300,25 @@ export default function Cola({ toast }) {
         </p>
       </header>
 
-      {permiso !== 'granted' && permiso !== 'no-soportado' && (
+      {empezados.length > 0 && (
         <div className="flag">
-          <strong>Avisos al empezar el partido.</strong> Puedo avisarte cuando arranque
-          cada partido con hora puesta.{' '}
-          <button className="mini" style={{ padding: 0 }}
-                  onClick={async () => setPermiso(await pedirPermiso())}>
-            Activar avisos
-          </button>
-          <br />
-          <span style={{ fontSize: 12 }}>
-            Solo funciona con la app abierta o en segundo plano, y desde el icono de la
-            pantalla de inicio. Si la cierras del multitarea, el aviso no llega.
-          </span>
+          <strong>
+            {empezados.length === 1 ? 'Un partido ya empezó' : `${empezados.length} partidos ya empezaron`}.
+          </strong>{' '}
+          {empezados.map(e => `${e.local} vs ${e.visitante}`).join(' · ')}. Ya no tiene
+          sentido analizarlos: quítalos de la cola cuando termines con ellos.
         </div>
       )}
 
-      {permiso === 'granted' && cuantosProgramados() > 0 && (
-        <div className="bet-sub" style={{ marginBottom: 12 }}>
-          {cuantosProgramados()} {cuantosProgramados() === 1 ? 'aviso programado' : 'avisos programados'}
+      {permiso !== 'granted' && permiso !== 'no-soportado' && (
+        <div className="flag">
+          <strong>Avisos al empezar el partido.</strong> Puedo intentar avisarte, pero iOS
+          congela los temporizadores en cuanto sales de la app, así que el aviso casi nunca
+          llega. El recuadro de arriba, que ves al abrir, es lo que sí funciona.{' '}
+          <button className="mini" style={{ padding: 0 }}
+                  onClick={async () => setPermiso(await pedirPermiso())}>
+            Activar de todos modos
+          </button>
         </div>
       )}
 
@@ -402,6 +429,8 @@ export default function Cola({ toast }) {
                   const ex = extras[it.id]
                   const ed = editando[it.id]
                   const marcado = seleccion.includes(it.id)
+                  const ini = inicioDe(it)
+                  const yaEmpezo = ini && ini.getTime() <= ahora
                   return (
                     <article className={`cola-item ${it.estado}`} key={it.id}>
                       <div style={{ display: 'flex', alignItems: 'stretch' }}>
@@ -415,6 +444,7 @@ export default function Cola({ toast }) {
                             <div className="cola-nom">{it.local} vs {it.visitante}</div>
                             <div className="cola-meta">
                               {it.hora || 'sin hora'}
+                              {yaEmpezo && ' · YA EMPEZÓ'}
                               {` · ${ESTADO_TXT[it.estado]}`}
                               {it.respuesta?.confianza != null && ` · conf ${it.respuesta.confianza}`}
                             </div>
@@ -482,6 +512,16 @@ export default function Cola({ toast }) {
                           {it.respuesta?.error && !it.respuesta?.mercados && (
                             <div className="flag">
                               <strong>No se pudo analizar.</strong> {it.respuesta.error}
+                              {it.respuesta.detalle && (
+                                <p className="razonamiento" style={{ marginTop: 8 }}>
+                                  {it.respuesta.detalle}
+                                </p>
+                              )}
+                              {it.respuesta.crudo && (
+                                <p className="razonamiento" style={{ marginTop: 8 }}>
+                                  {it.respuesta.crudo}
+                                </p>
+                              )}
                             </div>
                           )}
 
