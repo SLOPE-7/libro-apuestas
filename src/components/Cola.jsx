@@ -7,10 +7,6 @@ import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
-const MERCADOS_BASE = [
-  '1X2 - gana el local', 'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
-]
-
 const DISCRETOS = [
   '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
   'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
@@ -66,7 +62,8 @@ export default function Cola({ toast }) {
   const [nuevo, setNuevo] = useState({
     local: '', visitante: '', competicion: '', fecha_partido: '', hora: ''
   })
-  const [mercados, setMercados] = useState(MERCADOS_BASE)
+  // arranca vacío a propósito: cada partido se elige a conciencia
+  const [mercados, setMercados] = useState([])
 
   const alternarMercado = m =>
     setMercados(l => (l.includes(m) ? l.filter(x => x !== m) : [...l, m]))
@@ -147,8 +144,7 @@ export default function Cola({ toast }) {
     if (error) return toast('No se pudo añadir: ' + error.message)
     recordarCompeticion(nuevo.competicion)
     setNuevo({ local: '', visitante: '', competicion: nuevo.competicion, fecha_partido: '', hora: '' })
-    // los mercados vuelven a los básicos: cada partido se elige aparte
-    setMercados(MERCADOS_BASE)
+    setMercados([])
     toast('Añadido a la cola')
     recargar()
   }
@@ -377,7 +373,7 @@ export default function Cola({ toast }) {
             ))}
           </div>
 
-          {mercados.length > 0 && (
+          {mercados.length > 0 ? (
             <div className="elegidos">
               <span className="eyebrow">Se estimarán estos {mercados.length}</span>
               <div className="chips">
@@ -388,6 +384,11 @@ export default function Cola({ toast }) {
                 ))}
               </div>
             </div>
+          ) : (
+            <p className="ayuda">
+              Ningún mercado elegido. Marca solo los que de verdad ibas a apostar: el
+              registro sombra solo significa algo si mides lo que te interesaba.
+            </p>
           )}
         </div>
 
@@ -550,6 +551,12 @@ export default function Cola({ toast }) {
                                              placeholder="Liga/Copa/UEFA" />
                                 </div>
                                 {campo(it, 'hora', 'Hora', { placeholder: '13:00' })}
+                              </div>
+                              <div className="field">
+                                <label htmlFor={`fe-${it.id}`}>Fecha</label>
+                                <input id={`fe-${it.id}`} type="date"
+                                       value={it.fecha_partido ?? ''}
+                                       onChange={e => guardarCampo(it.id, 'fecha_partido', e.target.value)} />
                               </div>
                             </div>
                           )}
