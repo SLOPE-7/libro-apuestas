@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
@@ -59,6 +59,9 @@ export default function Cola({ toast }) {
   const [permiso, setPermiso] = useState(permisoAvisos())
   const [ahora, setAhora] = useState(Date.now())
 
+  // temporizadores para no escribir en la base en cada tecla
+  const esperas = useRef({})
+
   const [nuevo, setNuevo] = useState({
     local: '', visitante: '', competicion: '', fecha_partido: '', hora: ''
   })
@@ -74,22 +77,12 @@ export default function Cola({ toast }) {
     setItems(data || [])
   }
 
-  async function recargarArbitros() {
-    const { data } = await supabase.from('arbitros')
-      .select('*').order('visto_en', { ascending: false })
-    setArbitros(data || [])
-  }
-
-  async function recargarCompeticiones() {
-    const { data } = await supabase.from('competiciones')
-      .select('*').order('visto_en', { ascending: false })
-    setCompeticiones((data || []).map(c => c.nombre))
-  }
-
   useEffect(() => {
     recargar()
-    recargarArbitros()
-    recargarCompeticiones()
+    supabase.from('arbitros').select('*').order('visto_en', { ascending: false })
+      .then(({ data }) => setArbitros(data || []))
+    supabase.from('competiciones').select('*').order('visto_en', { ascending: false })
+      .then(({ data }) => setCompeticiones((data || []).map(c => c.nombre)))
     supabase.from('selecciones').select('partido').limit(600).then(({ data }) => {
       if (!data) return
       setEquipos([...new Set(
@@ -97,18 +90,18 @@ export default function Cola({ toast }) {
             .map(t => t.trim()).filter(Boolean)
       )].sort())
     })
+    // al desmontar, se lanzan los guardados que quedaran pendientes
+    return () => Object.values(esperas.current).forEach(t => clearTimeout(t))
   }, [])
 
-  /* El reloj interno: refresca la lista de "ya empezaron" cada minuto
-     y también al volver a la app, que es cuando de verdad lo vas a mirar. */
+  /* Reloj: refresca "ya empezaron" cada minuto y al volver a la app. */
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 60000)
-    const alVolver = () => { if (!document.hidden) { setAhora(Date.now()); recargar() } }
+    const alVolver = () => { if (!document.hidden) setAhora(Date.now()) }
     document.addEventListener('visibilitychange', alVolver)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [])
 
-  // los avisos del sistema solo saltan con la app viva; se programan igual
   useEffect(() => {
     if (permiso !== 'granted') return
     items.forEach(it => {
@@ -123,9 +116,25 @@ export default function Cola({ toast }) {
   async function recordarCompeticion(nombre) {
     const n = (nombre || '').trim()
     if (!n) return
-    await supabase.from('competiciones')
-      .upsert({ nombre: n, visto_en: new Date().toISOString() }, { onConflict: 'user_id,nombre' })
-    recargarCompeticiones()
+    const fila = { nombre: n, visto_en: new Date().toISOString() }
+    const { error } = await supabase.from('competiciones')
+      .upsert(fila, { onConflict: 'user_id,nombre' })
+    if (!error) setCompeticiones(l => [n, ...l.filter(x => x !== n)])
+  }
+
+  async function recordarArbitro(nombre, amarillas, rojas) {
+    const n = (nombre || '').trim()
+    if (!n) return
+    const fila = {
+      nombre: n,
+      amarillas: amarillas === '' || amarillas == null ? null : Number(amarillas),
+      rojas: rojas === '' || rojas == null ? null : Number(rojas),
+      visto_en: new Date().toISOString()
+    }
+    const { error } = await supabase.from('arbitros')
+      .upsert(fila, { onConflict: 'user_id,nombre' })
+    // se actualiza la lista en memoria en vez de volver a pedirla entera
+    if (!error) setArbitros(l => [fila, ...l.filter(a => a.nombre !== n)])
   }
 
   async function anadir() {
@@ -133,502 +142,5 @@ export default function Cola({ toast }) {
       return toast('Escribe los dos equipos')
     if (!mercados.length) return toast('Elige al menos un mercado')
 
-    const { error } = await supabase.from('cola').insert({
-      local: nuevo.local.trim(),
-      visitante: nuevo.visitante.trim(),
-      competicion: nuevo.competicion.trim() || null,
-      fecha_partido: nuevo.fecha_partido || null,
-      hora: nuevo.hora.trim() || null,
-      mercados
-    })
-    if (error) return toast('No se pudo añadir: ' + error.message)
-    recordarCompeticion(nuevo.competicion)
-    setNuevo({ local: '', visitante: '', competicion: nuevo.competicion, fecha_partido: '', hora: '' })
-    setMercados([])
-    toast('Añadido a la cola')
-    recargar()
-  }
-
-  async function guardarCampo(id, campo, valor) {
-    const v = valor === '' ? null : valor
-    const { error } = await supabase.from('cola').update({ [campo]: v }).eq('id', id)
-    if (error) return toast('No se pudo guardar')
-    setItems(l => l.map(i => (i.id === id ? { ...i, [campo]: v } : i)))
-    if (campo === 'competicion') recordarCompeticion(v)
-  }
-
-  async function borrar(id) {
-    const { error } = await supabase.from('cola').delete().eq('id', id)
-    if (error) return toast('No se pudo borrar')
-    cancelar(id)
-    setSeleccion(s => s.filter(x => x !== id))
-    recargar()
-  }
-
-  const alternarSeleccion = id =>
-    setSeleccion(s => (s.includes(id) ? s.filter(x => x !== id) : s.length >= 5 ? s : [...s, id]))
-
-  async function recordarArbitro(nombre, amarillas, rojas) {
-    const n = (nombre || '').trim()
-    if (!n) return
-    const { error } = await supabase.from('arbitros').upsert({
-      nombre: n,
-      amarillas: amarillas === '' || amarillas == null ? null : Number(amarillas),
-      rojas: rojas === '' || rojas == null ? null : Number(rojas),
-      visto_en: new Date().toISOString()
-    }, { onConflict: 'user_id,nombre' })
-    if (!error) recargarArbitros()
-  }
-
-  async function elegirArbitro(it, nombre) {
-    const a = arbitros.find(x => x.nombre === nombre)
-    const cambios = {
-      arbitro: nombre,
-      ...(a ? { arb_amarillas: a.amarillas, arb_rojas: a.rojas } : {})
-    }
-    const { error } = await supabase.from('cola').update(cambios).eq('id', it.id)
-    if (error) return toast('No se pudo guardar')
-    setItems(l => l.map(x => (x.id === it.id ? { ...x, ...cambios } : x)))
-    if (a) toast(`${nombre}: ${a.amarillas ?? '—'} amarillas de media`)
-  }
-
-  async function analizarSeleccion() {
-    if (!seleccion.length) return toast('Marca los partidos a analizar')
-    setCorriendo(true)
-
-    const lista = items.filter(i => seleccion.includes(i.id))
-    for (let n = 0; n < lista.length; n++) {
-      const it = lista[n]
-      setProgreso({ n: n + 1, total: lista.length, partido: `${it.local} vs ${it.visitante}` })
-      await supabase.from('cola').update({ estado: 'analizando' }).eq('id', it.id)
-      setItems(l => l.map(x => (x.id === it.id ? { ...x, estado: 'analizando' } : x)))
-
-      try {
-        const r = await fetch('/api/analizar', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            partido: `${it.local} vs ${it.visitante}`,
-            competicion: it.competicion || '',
-            fecha: it.fecha_partido || '',
-            mercados: it.mercados || [],
-            arbitro: it.arbitro || '',
-            arbAmarillas: it.arb_amarillas || '',
-            arbRojas: it.arb_rojas || '',
-            fase: it.fase || '',
-            resultadoIda: it.resultado_ida || '',
-            posLocal: it.pos_local || '',
-            posVisitante: it.pos_visitante || '',
-            prevCorners: it.prev_corners || '',
-            prevTarjetas: it.prev_tarjetas || '',
-            bajas: it.bajas || '',
-            notas: it.notas || ''
-          })
-        })
-        const data = await r.json()
-        const estado = data.error && !data.mercados ? 'error' : 'listo'
-        await supabase.from('cola')
-          .update({ estado, respuesta: data, analizado_en: new Date().toISOString() })
-          .eq('id', it.id)
-        setItems(l => l.map(x => (x.id === it.id ? { ...x, estado, respuesta: data } : x)))
-      } catch (e) {
-        const data = { error: 'No se pudo conectar con el servidor', detalle: String(e).slice(0, 300) }
-        await supabase.from('cola').update({ estado: 'error', respuesta: data }).eq('id', it.id)
-        setItems(l => l.map(x => (x.id === it.id ? { ...x, estado: 'error', respuesta: data } : x)))
-      }
-    }
-
-    setProgreso(null)
-    setCorriendo(false)
-    setSeleccion([])
-    toast('Análisis terminado')
-  }
-
-  async function guardarEnSombra(it) {
-    const lista = it.respuesta?.mercados || []
-    if (!lista.length) return toast('Nada que guardar')
-    const { error } = await supabase.from('sombra').insert(
-      lista.map(m => ({
-        partido: `${it.local} vs ${it.visitante}`,
-        competicion: it.competicion || null,
-        mercado_ia: m.mercado,
-        prob_ia: m.probabilidad,
-        cuota_ia: Number(it.cuota_mercado) > 1 ? Number(it.cuota_mercado) : null,
-        confianza: it.respuesta.confianza ?? null,
-        razonamiento: [it.respuesta.datos, it.respuesta.aviso].filter(Boolean).join('\n\n').slice(0, 4000)
-      }))
-    )
-    if (error) return toast('No se pudo guardar: ' + error.message)
-    toast(`${lista.length} estimaciones guardadas en sombra`)
-  }
-
-  const campo = (it, k, etiqueta, extra = {}) => (
-    <CampoLento id={`${k}-${it.id}`} etiqueta={etiqueta} valor={it[k] ?? ''}
-                onGuardar={v => guardarCampo(it.id, k, v)} {...extra} />
-  )
-
-  /* partidos cuya hora ya pasó */
-  const empezados = items.filter(it => {
-    const ini = inicioDe(it)
-    return ini && ini.getTime() <= ahora
-  })
-
-  /* agrupar por competición, y dentro por hora */
-  const grupos = Object.values(
-    items.reduce((acc, it) => {
-      const clave = it.competicion || 'Sin competición'
-      if (!acc[clave]) acc[clave] = { clave, items: [] }
-      acc[clave].items.push(it)
-      return acc
-    }, {})
-  ).map(g => ({
-    ...g,
-    items: g.items.slice().sort((a, b) => ((a.hora || '99') < (b.hora || '99') ? -1 : 1))
-  }))
-
-  return (
-    <section>
-      <header className="sec-head">
-        <h2>Cola de partidos</h2>
-        <p className="lede">
-          Añade los partidos que te interesen, rellena lo que sepas de Sofascore y
-          analiza por tandas. Máximo cinco de una vez.
-        </p>
-      </header>
-
-      {empezados.length > 0 && (
-        <div className="flag">
-          <strong>
-            {empezados.length === 1 ? 'Un partido ya empezó' : `${empezados.length} partidos ya empezaron`}.
-          </strong>{' '}
-          {empezados.map(e => `${e.local} vs ${e.visitante}`).join(' · ')}. Ya no tiene
-          sentido analizarlos: quítalos de la cola cuando termines con ellos.
-        </div>
-      )}
-
-      {permiso !== 'granted' && permiso !== 'no-soportado' && (
-        <div className="flag">
-          <strong>Avisos al empezar el partido.</strong> Puedo intentar avisarte, pero iOS
-          congela los temporizadores en cuanto sales de la app, así que el aviso casi nunca
-          llega. El recuadro de arriba, que ves al abrir, es lo que sí funciona.{' '}
-          <button className="mini" style={{ padding: 0 }}
-                  onClick={async () => setPermiso(await pedirPermiso())}>
-            Activar de todos modos
-          </button>
-        </div>
-      )}
-
-      <div className="card">
-        <div className="enfrenta">
-          <div className="field">
-            <label htmlFor="n-loc">Local</label>
-            <AutoInput id="n-loc" value={nuevo.local} opciones={equipos}
-                       onChange={v => setNuevo(n => ({ ...n, local: v }))} placeholder="Equipo A" />
-          </div>
-          <span className="vs" aria-hidden="true">vs</span>
-          <div className="field">
-            <label htmlFor="n-vis">Visitante</label>
-            <AutoInput id="n-vis" value={nuevo.visitante} opciones={equipos}
-                       onChange={v => setNuevo(n => ({ ...n, visitante: v }))} placeholder="Equipo B" />
-          </div>
-        </div>
-        <div className="row c2">
-          <div className="field">
-            <label htmlFor="n-comp">Competición</label>
-            <AutoInput id="n-comp" value={nuevo.competicion} opciones={competiciones}
-                       onChange={v => setNuevo(n => ({ ...n, competicion: v }))}
-                       placeholder="Liga/Copa/UEFA" />
-          </div>
-          <div className="field">
-            <label htmlFor="n-hora">Hora</label>
-            <input id="n-hora" value={nuevo.hora}
-                   onChange={e => setNuevo(n => ({ ...n, hora: e.target.value }))}
-                   placeholder="13:00" />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="n-fecha">Fecha</label>
-          <input id="n-fecha" type="date" value={nuevo.fecha_partido}
-                 onChange={e => setNuevo(n => ({ ...n, fecha_partido: e.target.value }))} />
-        </div>
-
-        <div className="field">
-          <label>Mercados · {mercados.length}</label>
-          <LineaMercado titulo="Goles" unidad="goles"
-                        lineasMas={L_GOLES} lineasMenos={L_GOLES}
-                        puestos={mercados} onAlternar={alternarMercado} />
-          <LineaMercado titulo="Córners" unidad="córners"
-                        lineasMas={L_CORNERS_MAS} lineasMenos={L_CORNERS_MENOS}
-                        puestos={mercados} onAlternar={alternarMercado} />
-          <LineaMercado titulo="Tarjetas" unidad="tarjetas"
-                        lineasMas={L_TARJ_MAS} lineasMenos={L_TARJ_MENOS}
-                        puestos={mercados} onAlternar={alternarMercado} />
-          <span className="eyebrow" style={{ display: 'block', margin: '14px 0 7px' }}>
-            Resultado y otros
-          </span>
-          <div className="chips">
-            {DISCRETOS.map(m => (
-              <button key={m} className={`chip ${mercados.includes(m) ? 'on' : ''}`}
-                      onClick={() => alternarMercado(m)}>{m}</button>
-            ))}
-          </div>
-
-          {mercados.length > 0 ? (
-            <div className="elegidos">
-              <span className="eyebrow">Se estimarán estos {mercados.length}</span>
-              <div className="chips">
-                {mercados.map(m => (
-                  <button key={m} className="chip on" onClick={() => alternarMercado(m)}>
-                    {m} ×
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="ayuda">
-              Ningún mercado elegido. Marca solo los que de verdad ibas a apostar: el
-              registro sombra solo significa algo si mides lo que te interesaba.
-            </p>
-          )}
-        </div>
-
-        <button className="act" onClick={anadir}>+ Añadir a la cola</button>
-      </div>
-
-      {progreso && (
-        <div className="progreso">
-          <b>{progreso.n} de {progreso.total}</b> · analizando {progreso.partido}
-          <div className="progreso-barra">
-            <div className="progreso-relleno"
-                 style={{ width: `${(progreso.n / progreso.total) * 100}%` }} />
-          </div>
-        </div>
-      )}
-
-      {items.length > 0 && (
-        <>
-          <div className="sec-label" style={{ marginTop: 20 }}>
-            <span className="eyebrow">En cola</span>
-            <span className="contador">{seleccion.length}/5 marcados</span>
-          </div>
-
-          {grupos.map(g => {
-            const ga = gruposAbiertos[g.clave] !== false
-            return (
-              <div key={g.clave}>
-                <button className="grupo-cab"
-                        onClick={() => setGruposAbiertos(x => ({ ...x, [g.clave]: !ga }))}>
-                  <span className="grupo-tit">{g.clave}</span>
-                  <span className="grupo-datos">
-                    <span className="contador">{g.items.length}</span>
-                    <span className="chevron">{ga ? '−' : '+'}</span>
-                  </span>
-                </button>
-
-                {ga && g.items.map(it => {
-                  const ab = abierto === it.id
-                  const ex = extras[it.id]
-                  const ed = editando[it.id]
-                  const marcado = seleccion.includes(it.id)
-                  const ini = inicioDe(it)
-                  const yaEmpezo = ini && ini.getTime() <= ahora
-                  return (
-                    <article className={`cola-item ${it.estado}`} key={it.id}>
-                      <div style={{ display: 'flex', alignItems: 'stretch' }}>
-                        <button className="tiny" style={{ margin: 11, alignSelf: 'center' }}
-                                onClick={() => alternarSeleccion(it.id)}
-                                aria-label="Marcar para analizar">
-                          {marcado ? '☑' : '☐'}
-                        </button>
-                        <button className="cola-cab" onClick={() => setAbierto(ab ? null : it.id)}>
-                          <div>
-                            <div className="cola-nom">{it.local} vs {it.visitante}</div>
-                            <div className="cola-meta">
-                              {it.hora || 'sin hora'}
-                              {yaEmpezo && ' · YA EMPEZÓ'}
-                              {` · ${ESTADO_TXT[it.estado]}`}
-                              {it.respuesta?.confianza != null && ` · conf ${it.respuesta.confianza}`}
-                            </div>
-                          </div>
-                          <span className="chevron">{ab ? '−' : '+'}</span>
-                        </button>
-                      </div>
-
-                      {ab && (
-                        <div className="cola-cuerpo">
-                          {it.respuesta?.mercados?.length > 0 && (
-                            <>
-                              {it.respuesta.datos && (
-                                <p className="razonamiento">{it.respuesta.datos}</p>
-                              )}
-                              {it.respuesta.mercados.map((m, i) => (
-                                <div className="sel" key={i}>
-                                  <div className="sel-row">
-                                    <div className="sel-txt">
-                                      <b>{m.mercado}</b>
-                                      {m.razon && <em>{m.razon}</em>}
-                                    </div>
-                                    <span className="odd">{pct(m.probabilidad)}</span>
-                                  </div>
-                                </div>
-                              ))}
-
-                              {it.respuesta.sugerencias?.length > 0 && (
-                                <div className="flag" style={{ marginTop: 12 }}>
-                                  <strong>Mercados alternativos.</strong>
-                                  <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                                    {it.respuesta.sugerencias.map((s, i) => (
-                                      <li key={i} style={{ marginBottom: 5 }}>
-                                        En lugar de <b>{s.en_lugar_de}</b>, considera{' '}
-                                        <b>{s.considera}</b> — {s.porque}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                  <p style={{ marginTop: 8, fontSize: 12 }}>
-                                    Más probable no significa mejor apuesta: lo que más se
-                                    cumple suele estar peor pagado. Mira la cuota antes.
-                                  </p>
-                                </div>
-                              )}
-
-                              {it.respuesta.aviso && (
-                                <div className="flag"><strong>Riesgo.</strong> {it.respuesta.aviso}</div>
-                              )}
-
-                              <div style={{ marginTop: 12 }}>
-                                <CampoLento id={`cm-${it.id}`}
-                                            etiqueta="Cuota que da la casa para tu mercado"
-                                            valor={it.cuota_mercado ?? ''} inputMode="decimal"
-                                            placeholder="1.85"
-                                            onGuardar={v => guardarCampo(it.id, 'cuota_mercado', v)} />
-                              </div>
-
-                              <button className="act" style={{ marginTop: 12 }}
-                                      onClick={() => guardarEnSombra(it)}>
-                                Guardar en sombra
-                              </button>
-                            </>
-                          )}
-
-                          {it.respuesta?.error && !it.respuesta?.mercados && (
-                            <div className="flag">
-                              <strong>No se pudo analizar.</strong> {it.respuesta.error}
-                              {it.respuesta.detalle && (
-                                <p className="razonamiento" style={{ marginTop: 8 }}>
-                                  {it.respuesta.detalle}
-                                </p>
-                              )}
-                              {it.respuesta.crudo && (
-                                <p className="razonamiento" style={{ marginTop: 8 }}>
-                                  {it.respuesta.crudo}
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="row c2" style={{ marginTop: 12 }}>
-                            <button className="extras-toggle"
-                                    onClick={() => setEditando(e => ({ ...e, [it.id]: !e[it.id] }))}>
-                              {ed ? '− Cerrar edición' : '✎ Editar partido'}
-                            </button>
-                            <button className="extras-toggle"
-                                    onClick={() => setExtras(e => ({ ...e, [it.id]: !e[it.id] }))}>
-                              {ex ? '− Ocultar Sofascore' : '+ Datos de Sofascore'}
-                            </button>
-                          </div>
-
-                          {ed && (
-                            <div style={{ marginTop: 12 }}>
-                              <div className="row c2">
-                                {campo(it, 'local', 'Local')}
-                                {campo(it, 'visitante', 'Visitante')}
-                              </div>
-                              <div className="row c2">
-                                <div className="field">
-                                  <label>Competición</label>
-                                  <AutoInput value={it.competicion ?? ''} opciones={competiciones}
-                                             onChange={v => guardarCampo(it.id, 'competicion', v)}
-                                             placeholder="Liga/Copa/UEFA" />
-                                </div>
-                                {campo(it, 'hora', 'Hora', { placeholder: '13:00' })}
-                              </div>
-                              <div className="field">
-                                <label htmlFor={`fe-${it.id}`}>Fecha</label>
-                                <input id={`fe-${it.id}`} type="date"
-                                       value={it.fecha_partido ?? ''}
-                                       onChange={e => guardarCampo(it.id, 'fecha_partido', e.target.value)} />
-                              </div>
-                            </div>
-                          )}
-
-                          {ex && (
-                            <div style={{ marginTop: 12 }}>
-                              <div className="field">
-                                <label>Árbitro</label>
-                                <AutoInput value={it.arbitro ?? ''}
-                                           opciones={arbitros.map(a => a.nombre)}
-                                           onChange={v => elegirArbitro(it, v)}
-                                           placeholder="Nombre del árbitro" />
-                              </div>
-                              <div className="row c2">
-                                <CampoLento id={`am-${it.id}`} etiqueta="Media amarillas"
-                                            valor={it.arb_amarillas ?? ''} inputMode="decimal"
-                                            placeholder="5.48"
-                                            onGuardar={v => {
-                                              guardarCampo(it.id, 'arb_amarillas', v)
-                                              recordarArbitro(it.arbitro, v, it.arb_rojas)
-                                            }} />
-                                <CampoLento id={`ro-${it.id}`} etiqueta="Media rojas"
-                                            valor={it.arb_rojas ?? ''} inputMode="decimal"
-                                            placeholder="0.39"
-                                            onGuardar={v => {
-                                              guardarCampo(it.id, 'arb_rojas', v)
-                                              recordarArbitro(it.arbitro, it.arb_amarillas, v)
-                                            }} />
-                              </div>
-                              <div className="row c2">
-                                {campo(it, 'prev_corners', 'Córners previstos', { inputMode: 'decimal', placeholder: '9' })}
-                                {campo(it, 'prev_tarjetas', 'Tarjetas previstas', { inputMode: 'decimal', placeholder: '4' })}
-                              </div>
-                              <div className="row c2">
-                                {campo(it, 'pos_local', 'Posición local', { placeholder: '3º · 24 pts' })}
-                                {campo(it, 'pos_visitante', 'Posición visitante', { placeholder: '11º · 14 pts' })}
-                              </div>
-                              <div className="row c2">
-                                {campo(it, 'fase', 'Fase', { placeholder: 'ida / vuelta / único' })}
-                                {campo(it, 'resultado_ida', 'Resultado de la ida', { placeholder: '2-0' })}
-                              </div>
-                              {campo(it, 'bajas', 'Bajas conocidas')}
-                              {campo(it, 'notas', 'Notas')}
-                              <p className="ayuda">
-                                Los árbitros y las competiciones se recuerdan. Los campos se
-                                guardan al salir de cada casilla.
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="bet-pie">
-                            <button className="tiny" onClick={() => borrar(it.id)}>
-                              Quitar de la cola
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </article>
-                  )
-                })}
-              </div>
-            )
-          })}
-
-          <button className="act" style={{ marginTop: 14 }}
-                  onClick={analizarSeleccion} disabled={corriendo || !seleccion.length}>
-            {corriendo
-              ? 'Analizando…'
-              : `Analizar ${seleccion.length || ''} ${seleccion.length === 1 ? 'partido' : 'partidos'}`}
-          </button>
-        </>
-      )}
-    </section>
-  )
-}
+    const { data, error } = await supabase.from('cola').insert({
+      local: nuevo.local
