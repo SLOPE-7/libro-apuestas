@@ -556,7 +556,7 @@ export default function Cola({ toast }) {
                               </div>
                               {competiciones.length > 0 && (
                                 <div className="chips">
-                                  {competiciones.slice(0, 8).map(c => (
+                                  {competiciones.slice(0, 6).map(c => (
                                     <button key={c} className="chip"
                                             onClick={() => guardarCampo(it.id, 'competicion', c)}>
                                       {c}
@@ -577,17 +577,33 @@ export default function Cola({ toast }) {
                                             if (v.trim()) recordarArbitro(v, it.arb_amarillas, it.arb_rojas)
                                           }} />
 
-                              {arbitros.length > 0 && (
-                                <div className="chips" style={{ marginTop: -4, marginBottom: 12 }}>
-                                  {arbitros.slice(0, 10).map(a => (
-                                    <button key={a.nombre}
-                                            className={`chip ${it.arbitro === a.nombre ? 'on' : ''}`}
-                                            onClick={() => ponerArbitro(it, a)}>
-                                      {a.nombre}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                              {arbitros.length > 0 && (() => {
+                                // solo los que encajan con lo escrito, y pocos:
+                                // con muchos árbitros la lista se vuelve un muro
+                                const q = (it.arbitro || '').trim().toLowerCase()
+                                const cerca = q
+                                  ? arbitros.filter(a => a.nombre.toLowerCase().includes(q))
+                                  : arbitros
+                                const muestra = cerca.slice(0, q ? 5 : 4)
+                                if (!muestra.length) return null
+                                return (
+                                  <div style={{ marginTop: -4, marginBottom: 12 }}>
+                                    <span className="eyebrow">
+                                      {q ? 'Coincidencias' : 'Últimos usados'}
+                                    </span>
+                                    <div className="chips" style={{ marginTop: 6 }}>
+                                      {muestra.map(a => (
+                                        <button key={a.nombre}
+                                                className={`chip ${it.arbitro === a.nombre ? 'on' : ''}`}
+                                                onClick={() => ponerArbitro(it, a)}>
+                                          {a.nombre}
+                                          {a.amarillas != null && ` · ${a.amarillas}`}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })()}
 
                               <div className="row c2">
                                 <CampoLento id={`am-${it.id}`} etiqueta="Media amarillas"
@@ -620,8 +636,9 @@ export default function Cola({ toast }) {
                               {campo(it, 'bajas', 'Bajas conocidas')}
                               {campo(it, 'notas', 'Notas')}
                               <p className="ayuda">
-                                Escribe el árbitro una vez y queda guardado: la próxima vez
-                                lo tocas en la lista de arriba y sus medias se rellenan solas.
+                                Escribe dos o tres letras del árbitro y aparecerán las
+                                coincidencias con su media de amarillas al lado. Un toque
+                                y se rellena todo.
                               </p>
                             </div>
                           )}
