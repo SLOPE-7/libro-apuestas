@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
 import CampoLento from './CampoLento'
+import { parseCola } from '../lib/parseCola'
 import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
@@ -58,6 +59,11 @@ export default function Cola({ toast }) {
   const [progreso, setProgreso] = useState(null)
   const [permiso, setPermiso] = useState(permisoAvisos())
   const [ahora, setAhora] = useState(Date.now())
+
+  // pegar cupón
+  const [pegando, setPegando] = useState(false)
+  const [cupon, setCupon] = useState('')
+  const [ligaCupon, setLigaCupon] = useState('')
 
   // temporizadores para no escribir en la base en cada tecla
   const esperas = useRef({})
@@ -144,6 +150,35 @@ export default function Cola({ toast }) {
     toast(`${a.nombre}: ${a.amarillas ?? '—'} amarillas de media`)
   }
 
+  /* ── pegar cupón ─────────────────────────────────────── */
+  async function importarCupon() {
+    const leidos = parseCola(cupon)
+    if (!leidos.length) return toast('No reconocí ningún partido en ese texto')
+
+    const filas = leidos.map(p => ({
+      local: p.local,
+      visitante: p.visitante,
+      competicion: ligaCupon.trim() || null,
+      fecha_partido: p.fecha_partido,
+      hora: p.hora,
+      mercados: p.mercados,
+      cuota_mercado: p.cuota
+    }))
+
+    const { data, error } = await supabase.from('cola').insert(filas).select()
+    if (error) return toast('No se pudo guardar: ' + error.message)
+
+    if (ligaCupon.trim()) recordarCompeticion(ligaCupon)
+    setItems(l => [...(data || []), ...l])
+    setPegando(false)
+    setCupon('')
+
+    const sinMercados = leidos.filter(p => !p.mercados.length).length
+    let msg = `${leidos.length} ${leidos.length === 1 ? 'partido leído' : 'partidos leídos'}`
+    if (sinMercados) msg += ` · ${sinMercados} sin mercados`
+    toast(msg + ' — revísalos')
+  }
+
   async function anadir() {
     if (!nuevo.local.trim() || !nuevo.visitante.trim())
       return toast('Escribe los dos equipos')
@@ -184,6 +219,20 @@ export default function Cola({ toast }) {
     }, 500)
   }
 
+  /** Añade o quita un mercado de un partido que ya está en cola. */
+  function alternarMercadoItem(it, m) {
+    const lista = Array.isArray(it.mercados) ? it.mercados : []
+    const nueva = lista.includes(m) ? lista.filter(x => x !== m) : [...lista, m]
+    setItems(l => l.map(x => (x.id === it.id ? { ...x, mercados: nueva } : x)))
+
+    const clave = `${it.id}:mercados`
+    clearTimeout(esperas.current[clave])
+    esperas.current[clave] = setTimeout(async () => {
+      await supabase.from('cola').update({ mercados: nueva }).eq('id', it.id)
+      delete esperas.current[clave]
+    }, 400)
+  }
+
   async function borrar(id) {
     const { error } = await supabase.from('cola').delete().eq('id', id)
     if (error) return toast('No se pudo borrar')
@@ -197,6 +246,9 @@ export default function Cola({ toast }) {
 
   async function analizarSeleccion() {
     if (!seleccion.length) return toast('Marca los partidos a analizar')
+    const sinMercados = items.filter(i => seleccion.includes(i.id) && !(i.mercados || []).length)
+    if (sinMercados.length) return toast('Hay partidos marcados sin mercados elegidos')
+
     setCorriendo(true)
 
     const lista = items.filter(i => seleccion.includes(i.id))
@@ -292,8 +344,8 @@ export default function Cola({ toast }) {
       <header className="sec-head">
         <h2>Cola de partidos</h2>
         <p className="lede">
-          Añade los partidos que te interesen, rellena lo que sepas de Sofascore y
-          analiza por tandas. Máximo cinco de una vez.
+          Pega el cupón de la casa o añade partidos a mano. Rellena lo que sepas de
+          Sofascore y analiza por tandas. Máximo cinco de una vez.
         </p>
       </header>
 
@@ -316,6 +368,38 @@ export default function Cola({ toast }) {
                   onClick={async () => setPermiso(await pedirPermiso())}>
             Activar de todos modos
           </button>
+        </div>
+      )}
+
+      {!pegando ? (
+        <button className="ghost" style={{ marginBottom: 16 }} onClick={() => setPegando(true)}>
+          ⎘ Pegar cupón de la casa
+        </button>
+      ) : (
+        <div className="card pegar">
+          <div className="field">
+            <label htmlFor="cupon-cola">Pega aquí el texto del cupón</label>
+            <textarea id="cupon-cola" rows={8} value={cupon}
+                      onChange={e => setCupon(e.target.value)}
+                      placeholder={'30/08/2026 • 07:00\nEquipo A\nvs\nEquipo B\n2.25\n1x2\n1\nTotal de goles\nMás de 1.5\n…'} />
+          </div>
+          <div className="field">
+            <label htmlFor="liga-cupon">Competición para todos</label>
+            <AutoInput id="liga-cupon" value={ligaCupon} opciones={competiciones}
+                       onChange={setLigaCupon} placeholder="Premier League" />
+          </div>
+          <p className="ayuda">
+            El cupón trae equipos, fecha, hora y mercados, pero no la liga: escríbela aquí
+            y se aplica a todos los partidos del pegado. Si son de ligas distintas, la
+            corriges luego en cada uno. Los que vengan sin mercados quedarán marcados en
+            rojo hasta que elijas alguno.
+          </p>
+          <div className="row c2" style={{ marginTop: 12 }}>
+            <button className="act" onClick={importarCupon}>Leer cupón</button>
+            <button className="ghost" onClick={() => { setPegando(false); setCupon('') }}>
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
@@ -433,6 +517,7 @@ export default function Cola({ toast }) {
                   const marcado = seleccion.includes(it.id)
                   const ini = inicioDe(it)
                   const yaEmpezo = ini && ini.getTime() <= ahora
+                  const susMercados = Array.isArray(it.mercados) ? it.mercados : []
                   return (
                     <article className={`cola-item ${it.estado}`} key={it.id}>
                       <div style={{ display: 'flex', alignItems: 'stretch' }}>
@@ -447,6 +532,7 @@ export default function Cola({ toast }) {
                             <div className="cola-meta">
                               {it.hora || 'sin hora'}
                               {yaEmpezo && ' · YA EMPEZÓ'}
+                              {` · ${susMercados.length} merc`}
                               {` · ${ESTADO_TXT[it.estado]}`}
                               {it.respuesta?.confianza != null && ` · conf ${it.respuesta.confianza}`}
                             </div>
@@ -457,6 +543,13 @@ export default function Cola({ toast }) {
 
                       {ab && (
                         <div className="cola-cuerpo">
+                          {!susMercados.length && (
+                            <div className="flag">
+                              <strong>Sin mercados.</strong> Elige abajo qué quieres que
+                              estime antes de mandarlo a analizar.
+                            </div>
+                          )}
+
                           {it.respuesta?.mercados?.length > 0 && (
                             <>
                               {it.respuesta.datos && (
@@ -496,14 +589,6 @@ export default function Cola({ toast }) {
                                 <div className="flag"><strong>Riesgo.</strong> {it.respuesta.aviso}</div>
                               )}
 
-                              <div style={{ marginTop: 12 }}>
-                                <CampoLento id={`cm-${it.id}`}
-                                            etiqueta="Cuota que da la casa para tu mercado"
-                                            valor={it.cuota_mercado ?? ''} inputMode="decimal"
-                                            placeholder="1.85"
-                                            onGuardar={v => guardarCampo(it.id, 'cuota_mercado', v)} />
-                              </div>
-
                               <button className="act" style={{ marginTop: 12 }}
                                       onClick={() => guardarEnSombra(it)}>
                                 Guardar en sombra
@@ -527,10 +612,18 @@ export default function Cola({ toast }) {
                             </div>
                           )}
 
+                          <div style={{ marginTop: 12 }}>
+                            <CampoLento id={`cm-${it.id}`}
+                                        etiqueta="Cuota que da la casa"
+                                        valor={it.cuota_mercado ?? ''} inputMode="decimal"
+                                        placeholder="1.85"
+                                        onGuardar={v => guardarCampo(it.id, 'cuota_mercado', v)} />
+                          </div>
+
                           <div className="row c2" style={{ marginTop: 12 }}>
                             <button className="extras-toggle"
                                     onClick={() => setEditando(e => ({ ...e, [it.id]: !e[it.id] }))}>
-                              {ed ? '− Cerrar edición' : '✎ Editar partido'}
+                              {ed ? '− Cerrar edición' : '✎ Editar y mercados'}
                             </button>
                             <button className="extras-toggle"
                                     onClick={() => setExtras(e => ({ ...e, [it.id]: !e[it.id] }))}>
@@ -564,6 +657,45 @@ export default function Cola({ toast }) {
                                   ))}
                                 </div>
                               )}
+
+                              <div className="field" style={{ marginTop: 14 }}>
+                                <label>Mercados de este partido · {susMercados.length}</label>
+                                <LineaMercado titulo="Goles" unidad="goles"
+                                              lineasMas={L_GOLES} lineasMenos={L_GOLES}
+                                              puestos={susMercados}
+                                              onAlternar={m => alternarMercadoItem(it, m)} />
+                                <LineaMercado titulo="Córners" unidad="córners"
+                                              lineasMas={L_CORNERS_MAS} lineasMenos={L_CORNERS_MENOS}
+                                              puestos={susMercados}
+                                              onAlternar={m => alternarMercadoItem(it, m)} />
+                                <LineaMercado titulo="Tarjetas" unidad="tarjetas"
+                                              lineasMas={L_TARJ_MAS} lineasMenos={L_TARJ_MENOS}
+                                              puestos={susMercados}
+                                              onAlternar={m => alternarMercadoItem(it, m)} />
+                                <span className="eyebrow" style={{ display: 'block', margin: '14px 0 7px' }}>
+                                  Resultado y otros
+                                </span>
+                                <div className="chips">
+                                  {DISCRETOS.map(m => (
+                                    <button key={m}
+                                            className={`chip ${susMercados.includes(m) ? 'on' : ''}`}
+                                            onClick={() => alternarMercadoItem(it, m)}>{m}</button>
+                                  ))}
+                                </div>
+                                {susMercados.length > 0 && (
+                                  <div className="elegidos">
+                                    <span className="eyebrow">Se estimarán estos {susMercados.length}</span>
+                                    <div className="chips">
+                                      {susMercados.map(m => (
+                                        <button key={m} className="chip on"
+                                                onClick={() => alternarMercadoItem(it, m)}>
+                                          {m} ×
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
 
@@ -637,8 +769,7 @@ export default function Cola({ toast }) {
                               {campo(it, 'notas', 'Notas')}
                               <p className="ayuda">
                                 Escribe dos o tres letras del árbitro y aparecerán las
-                                coincidencias con su media de amarillas al lado. Un toque
-                                y se rellena todo.
+                                coincidencias con su media de amarillas al lado.
                               </p>
                             </div>
                           )}
