@@ -4,31 +4,13 @@ import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
 import CampoLento from './CampoLento'
 import { parseCola } from '../lib/parseCola'
+import { paisDe, PAISES } from '../lib/paises'
+import {
+  DISCRETOS, L_GOLES, L_CORNERS_MAS, L_CORNERS_MENOS, L_TARJ_MAS, L_TARJ_MENOS
+} from '../lib/mercados'
 import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
-
-const DISCRETOS = [
-  '1X2 - gana el local', '1X2 - empate', '1X2 - gana el visitante',
-  'Doble oportunidad - local o empate', 'Doble oportunidad - visitante o empate',
-  'Ambos equipos marcan',
-  'Local gana cualquier mitad', 'Visitante gana cualquier mitad',
-  'Más de 0.5 goles en la primera mitad', 'Más de 1.5 goles en la primera mitad',
-  'Menos de 1.5 goles en la primera mitad', 'Más de 2.5 goles en la primera mitad',
-  'Primera mitad 1X', 'Primera mitad 2X',
-  'Local más de 0.5 goles', 'Visitante más de 0.5 goles',
-  'Local Hándicap +0', 'Local Hándicap +0.5', 'Local Hándicap +1',
-  'Local Hándicap +1.5', 'Local Hándicap +2', 'Local Hándicap +2.5',
-  'Visitante Hándicap +0', 'Visitante Hándicap +0.5', 'Visitante Hándicap +1',
-  'Visitante Hándicap +1.5', 'Visitante Hándicap +2', 'Visitante Hándicap +2.5',
-  'Se clasifica el local', 'Se clasifica el visitante'
-]
-
-const L_GOLES         = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
-const L_CORNERS_MAS   = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]
-const L_CORNERS_MENOS = [...L_CORNERS_MAS, 15.5, 16.5]
-const L_TARJ_MAS      = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
-const L_TARJ_MENOS    = [...L_TARJ_MAS, 7.5]
 
 const ESTADO_TXT = {
   pendiente: 'Sin analizar', analizando: 'Analizando…',
@@ -43,6 +25,14 @@ function inicioDe(it) {
   const d = new Date(`${it.fecha_partido}T00:00:00`)
   d.setHours(h, m || 0, 0, 0)
   return d
+}
+
+/** Un partido está listo para archivar si terminó y ya fue analizado. */
+function terminado(it, ahora) {
+  const ini = inicioDe(it)
+  if (!ini) return false
+  const finAprox = ini.getTime() + 2.5 * 60 * 60 * 1000
+  return finAprox <= ahora
 }
 
 export default function Cola({ toast }) {
@@ -60,18 +50,16 @@ export default function Cola({ toast }) {
   const [permiso, setPermiso] = useState(permisoAvisos())
   const [ahora, setAhora] = useState(Date.now())
 
-  // pegar cupón
   const [pegando, setPegando] = useState(false)
   const [cupon, setCupon] = useState('')
   const [ligaCupon, setLigaCupon] = useState('')
+  const [paisCupon, setPaisCupon] = useState('')
 
-  // temporizadores para no escribir en la base en cada tecla
   const esperas = useRef({})
 
   const [nuevo, setNuevo] = useState({
-    local: '', visitante: '', competicion: '', fecha_partido: '', hora: ''
+    local: '', visitante: '', competicion: '', pais: '', fecha_partido: '', hora: ''
   })
-  // arranca vacío a propósito: cada partido se elige a conciencia
   const [mercados, setMercados] = useState([])
 
   const alternarMercado = m =>
@@ -88,7 +76,7 @@ export default function Cola({ toast }) {
     supabase.from('arbitros').select('*').order('visto_en', { ascending: false })
       .then(({ data }) => setArbitros(data || []))
     supabase.from('competiciones').select('*').order('visto_en', { ascending: false })
-      .then(({ data }) => setCompeticiones((data || []).map(c => c.nombre)))
+      .then(({ data }) => setCompeticiones(data || []))
     supabase.from('selecciones').select('partido').limit(600).then(({ data }) => {
       if (!data) return
       setEquipos([...new Set(
@@ -100,7 +88,6 @@ export default function Cola({ toast }) {
     return () => Object.values(pendientes).forEach(t => clearTimeout(t))
   }, [])
 
-  /* Reloj: refresca "ya empezaron" cada minuto y al volver a la app. */
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 60000)
     const alVolver = () => { if (!document.hidden) setAhora(Date.now()) }
@@ -119,12 +106,21 @@ export default function Cola({ toast }) {
     })
   }, [items, permiso])
 
-  async function recordarCompeticion(nombre) {
+  const nombresComp = competiciones.map(c => c.nombre)
+
+  /* El país se adivina del nombre, y si ya usaste esa liga antes se recuerda. */
+  function paisPara(comp) {
+    const guardado = competiciones.find(c => c.nombre === comp)?.pais
+    return guardado || paisDe(comp) || ''
+  }
+
+  async function recordarCompeticion(nombre, pais) {
     const n = (nombre || '').trim()
     if (!n) return
+    const fila = { nombre: n, pais: pais || paisDe(n) || null, visto_en: new Date().toISOString() }
     const { error } = await supabase.from('competiciones')
-      .upsert({ nombre: n, visto_en: new Date().toISOString() }, { onConflict: 'user_id,nombre' })
-    if (!error) setCompeticiones(l => [n, ...l.filter(x => x !== n)])
+      .upsert(fila, { onConflict: 'user_id,nombre' })
+    if (!error) setCompeticiones(l => [fila, ...l.filter(c => c.nombre !== n)])
   }
 
   async function recordarArbitro(nombre, amarillas, rojas) {
@@ -141,7 +137,6 @@ export default function Cola({ toast }) {
     if (!error) setArbitros(l => [fila, ...l.filter(a => a.nombre !== n)])
   }
 
-  /* Un toque y quedan nombre y medias puestos, sin escribir nada. */
   async function ponerArbitro(it, a) {
     const cambios = { arbitro: a.nombre, arb_amarillas: a.amarillas, arb_rojas: a.rojas }
     setItems(l => l.map(x => (x.id === it.id ? { ...x, ...cambios } : x)))
@@ -150,15 +145,18 @@ export default function Cola({ toast }) {
     toast(`${a.nombre}: ${a.amarillas ?? '—'} amarillas de media`)
   }
 
-  /* ── pegar cupón ─────────────────────────────────────── */
   async function importarCupon() {
     const leidos = parseCola(cupon)
     if (!leidos.length) return toast('No reconocí ningún partido en ese texto')
 
+    const liga = ligaCupon.trim() || null
+    const pais = paisCupon.trim() || paisPara(liga) || null
+
     const filas = leidos.map(p => ({
       local: p.local,
       visitante: p.visitante,
-      competicion: ligaCupon.trim() || null,
+      competicion: liga,
+      pais,
       fecha_partido: p.fecha_partido,
       hora: p.hora,
       mercados: p.mercados,
@@ -168,7 +166,7 @@ export default function Cola({ toast }) {
     const { data, error } = await supabase.from('cola').insert(filas).select()
     if (error) return toast('No se pudo guardar: ' + error.message)
 
-    if (ligaCupon.trim()) recordarCompeticion(ligaCupon)
+    if (liga) recordarCompeticion(liga, pais)
     setItems(l => [...(data || []), ...l])
     setPegando(false)
     setCupon('')
@@ -184,27 +182,30 @@ export default function Cola({ toast }) {
       return toast('Escribe los dos equipos')
     if (!mercados.length) return toast('Elige al menos un mercado')
 
+    const liga = nuevo.competicion.trim() || null
+    const pais = nuevo.pais.trim() || paisPara(liga) || null
+
     const { data, error } = await supabase.from('cola').insert({
       local: nuevo.local.trim(),
       visitante: nuevo.visitante.trim(),
-      competicion: nuevo.competicion.trim() || null,
+      competicion: liga,
+      pais,
       fecha_partido: nuevo.fecha_partido || null,
       hora: nuevo.hora.trim() || null,
       mercados
     }).select().single()
     if (error) return toast('No se pudo añadir: ' + error.message)
 
-    recordarCompeticion(nuevo.competicion)
+    if (liga) recordarCompeticion(liga, pais)
     setItems(l => [data, ...l])
-    setNuevo({ local: '', visitante: '', competicion: nuevo.competicion, fecha_partido: '', hora: '' })
+    setNuevo({
+      local: '', visitante: '', competicion: nuevo.competicion,
+      pais: nuevo.pais, fecha_partido: '', hora: ''
+    })
     setMercados([])
     toast('Añadido a la cola')
   }
 
-  /**
-   * Guarda un campo. La pantalla se actualiza al momento y la escritura en
-   * la base espera medio segundo: hacerlo en cada tecla saturaba iOS.
-   */
   function guardarCampo(id, campo, valor) {
     const v = valor === '' ? null : valor
     setItems(l => l.map(i => (i.id === id ? { ...i, [campo]: v } : i)))
@@ -212,14 +213,22 @@ export default function Cola({ toast }) {
     const clave = `${id}:${campo}`
     clearTimeout(esperas.current[clave])
     esperas.current[clave] = setTimeout(async () => {
-      const { error } = await supabase.from('cola').update({ [campo]: v }).eq('id', id)
+      const cambios = { [campo]: v }
+      // al cambiar la liga, el país se rellena solo si lo conocemos
+      if (campo === 'competicion' && v) {
+        const p = paisPara(v)
+        if (p) cambios.pais = p
+      }
+      const { error } = await supabase.from('cola').update(cambios).eq('id', id)
       if (error) toast('No se pudo guardar')
-      else if (campo === 'competicion' && v) recordarCompeticion(v)
+      else {
+        if (cambios.pais) setItems(l => l.map(i => (i.id === id ? { ...i, pais: cambios.pais } : i)))
+        if (campo === 'competicion' && v) recordarCompeticion(v, cambios.pais)
+      }
       delete esperas.current[clave]
     }, 500)
   }
 
-  /** Añade o quita un mercado de un partido que ya está en cola. */
   function alternarMercadoItem(it, m) {
     const lista = Array.isArray(it.mercados) ? it.mercados : []
     const nueva = lista.includes(m) ? lista.filter(x => x !== m) : [...lista, m]
@@ -239,6 +248,19 @@ export default function Cola({ toast }) {
     cancelar(id)
     setSeleccion(s => s.filter(x => x !== id))
     setItems(l => l.filter(i => i.id !== id))
+  }
+
+  /** Vacía los partidos ya jugados. Los sin analizar se quedan. */
+  async function limpiarJugados() {
+    const viejos = items.filter(it => terminado(it, ahora) && it.estado !== 'pendiente')
+    if (!viejos.length) return toast('No hay partidos jugados que quitar')
+    const ids = viejos.map(v => v.id)
+    const { error } = await supabase.from('cola').delete().in('id', ids)
+    if (error) return toast('No se pudo limpiar')
+    ids.forEach(cancelar)
+    setSeleccion(s => s.filter(x => !ids.includes(x)))
+    setItems(l => l.filter(i => !ids.includes(i.id)))
+    toast(`${viejos.length} ${viejos.length === 1 ? 'partido quitado' : 'partidos quitados'}`)
   }
 
   const alternarSeleccion = id =>
@@ -265,6 +287,7 @@ export default function Cola({ toast }) {
           body: JSON.stringify({
             partido: `${it.local} vs ${it.visitante}`,
             competicion: it.competicion || '',
+            pais: it.pais || '',
             fecha: it.fecha_partido || '',
             mercados: it.mercados || [],
             arbitro: it.arbitro || '',
@@ -308,13 +331,12 @@ export default function Cola({ toast }) {
         competicion: it.competicion || null,
         mercado_ia: m.mercado,
         prob_ia: m.probabilidad,
-        cuota_ia: Number(it.cuota_mercado) > 1 ? Number(it.cuota_mercado) : null,
         confianza: it.respuesta.confianza ?? null,
         razonamiento: [it.respuesta.datos, it.respuesta.aviso].filter(Boolean).join('\n\n').slice(0, 4000)
       }))
     )
     if (error) return toast('No se pudo guardar: ' + error.message)
-    toast(`${lista.length} estimaciones guardadas en sombra`)
+    toast(`${lista.length} guardadas · anota las cuotas en Sombra`)
   }
 
   const campo = (it, k, etiqueta, extra = {}) => (
@@ -326,10 +348,13 @@ export default function Cola({ toast }) {
     const ini = inicioDe(it)
     return ini && ini.getTime() <= ahora
   })
+  const jugados = items.filter(it => terminado(it, ahora) && it.estado !== 'pendiente')
 
   const grupos = Object.values(
     items.reduce((acc, it) => {
-      const clave = it.competicion || 'Sin competición'
+      const clave = it.competicion
+        ? it.competicion + (it.pais ? ` · ${it.pais}` : '')
+        : 'Sin competición'
       if (!acc[clave]) acc[clave] = { clave, items: [] }
       acc[clave].items.push(it)
       return acc
@@ -354,16 +379,22 @@ export default function Cola({ toast }) {
           <strong>
             {empezados.length === 1 ? 'Un partido ya empezó' : `${empezados.length} partidos ya empezaron`}.
           </strong>{' '}
-          {empezados.map(e => `${e.local} vs ${e.visitante}`).join(' · ')}. Ya no tiene
-          sentido analizarlos: quítalos de la cola cuando termines con ellos.
+          {empezados.slice(0, 4).map(e => `${e.local} vs ${e.visitante}`).join(' · ')}
+          {empezados.length > 4 && ` y ${empezados.length - 4} más`}.
         </div>
+      )}
+
+      {jugados.length > 0 && (
+        <button className="ghost" style={{ marginBottom: 14 }} onClick={limpiarJugados}>
+          Quitar {jugados.length} {jugados.length === 1 ? 'partido jugado' : 'partidos jugados'}
+        </button>
       )}
 
       {permiso !== 'granted' && permiso !== 'no-soportado' && (
         <div className="flag">
-          <strong>Avisos al empezar el partido.</strong> Puedo intentar avisarte, pero iOS
-          congela los temporizadores en cuanto sales de la app, así que el aviso casi nunca
-          llega. El recuadro de arriba, que ves al abrir, es lo que sí funciona.{' '}
+          <strong>Avisos al empezar el partido.</strong> iOS congela los temporizadores en
+          cuanto sales de la app, así que el aviso casi nunca llega. El recuadro de arriba
+          es lo que sí funciona.{' '}
           <button className="mini" style={{ padding: 0 }}
                   onClick={async () => setPermiso(await pedirPermiso())}>
             Activar de todos modos
@@ -383,16 +414,22 @@ export default function Cola({ toast }) {
                       onChange={e => setCupon(e.target.value)}
                       placeholder={'30/08/2026 • 07:00\nEquipo A\nvs\nEquipo B\n2.25\n1x2\n1\nTotal de goles\nMás de 1.5\n…'} />
           </div>
-          <div className="field">
-            <label htmlFor="liga-cupon">Competición para todos</label>
-            <AutoInput id="liga-cupon" value={ligaCupon} opciones={competiciones}
-                       onChange={setLigaCupon} placeholder="Premier League" />
+          <div className="row c2">
+            <div className="field">
+              <label htmlFor="liga-cupon">Competición</label>
+              <AutoInput id="liga-cupon" value={ligaCupon} opciones={nombresComp}
+                         onChange={v => { setLigaCupon(v); const p = paisPara(v); if (p) setPaisCupon(p) }}
+                         placeholder="Premier League" />
+            </div>
+            <div className="field">
+              <label htmlFor="pais-cupon">País</label>
+              <AutoInput id="pais-cupon" value={paisCupon} opciones={PAISES}
+                         onChange={setPaisCupon} placeholder="Inglaterra" />
+            </div>
           </div>
           <p className="ayuda">
-            El cupón trae equipos, fecha, hora y mercados, pero no la liga: escríbela aquí
-            y se aplica a todos los partidos del pegado. Si son de ligas distintas, la
-            corriges luego en cada uno. Los que vengan sin mercados quedarán marcados en
-            rojo hasta que elijas alguno.
+            El país importa: hay ligas homónimas en varios países y sin él el modelo puede
+            analizar el partido equivocado. Se rellena solo si reconozco la competición.
           </p>
           <div className="row c2" style={{ marginTop: 12 }}>
             <button className="act" onClick={importarCupon}>Leer cupón</button>
@@ -420,9 +457,25 @@ export default function Cola({ toast }) {
         <div className="row c2">
           <div className="field">
             <label htmlFor="n-comp">Competición</label>
-            <AutoInput id="n-comp" value={nuevo.competicion} opciones={competiciones}
-                       onChange={v => setNuevo(n => ({ ...n, competicion: v }))}
+            <AutoInput id="n-comp" value={nuevo.competicion} opciones={nombresComp}
+                       onChange={v => {
+                         const p = paisPara(v)
+                         setNuevo(n => ({ ...n, competicion: v, pais: p || n.pais }))
+                       }}
                        placeholder="Liga/Copa/UEFA" />
+          </div>
+          <div className="field">
+            <label htmlFor="n-pais">País</label>
+            <AutoInput id="n-pais" value={nuevo.pais} opciones={PAISES}
+                       onChange={v => setNuevo(n => ({ ...n, pais: v }))}
+                       placeholder="Inglaterra" />
+          </div>
+        </div>
+        <div className="row c2">
+          <div className="field">
+            <label htmlFor="n-fecha">Fecha</label>
+            <input id="n-fecha" type="date" value={nuevo.fecha_partido}
+                   onChange={e => setNuevo(n => ({ ...n, fecha_partido: e.target.value }))} />
           </div>
           <div className="field">
             <label htmlFor="n-hora">Hora</label>
@@ -430,11 +483,6 @@ export default function Cola({ toast }) {
                    onChange={e => setNuevo(n => ({ ...n, hora: e.target.value }))}
                    placeholder="13:00" />
           </div>
-        </div>
-        <div className="field">
-          <label htmlFor="n-fecha">Fecha</label>
-          <input id="n-fecha" type="date" value={nuevo.fecha_partido}
-                 onChange={e => setNuevo(n => ({ ...n, fecha_partido: e.target.value }))} />
         </div>
 
         <div className="field">
@@ -471,8 +519,7 @@ export default function Cola({ toast }) {
             </div>
           ) : (
             <p className="ayuda">
-              Ningún mercado elegido. Marca solo los que de verdad ibas a apostar: el
-              registro sombra solo significa algo si mides lo que te interesaba.
+              Ningún mercado elegido. Marca solo los que de verdad ibas a apostar.
             </p>
           )}
         </div>
@@ -580,7 +627,7 @@ export default function Cola({ toast }) {
                                   </ul>
                                   <p style={{ marginTop: 8, fontSize: 12 }}>
                                     Más probable no significa mejor apuesta: lo que más se
-                                    cumple suele estar peor pagado. Mira la cuota antes.
+                                    cumple suele estar peor pagado.
                                   </p>
                                 </div>
                               )}
@@ -612,14 +659,6 @@ export default function Cola({ toast }) {
                             </div>
                           )}
 
-                          <div style={{ marginTop: 12 }}>
-                            <CampoLento id={`cm-${it.id}`}
-                                        etiqueta="Cuota que da la casa"
-                                        valor={it.cuota_mercado ?? ''} inputMode="decimal"
-                                        placeholder="1.85"
-                                        onGuardar={v => guardarCampo(it.id, 'cuota_mercado', v)} />
-                          </div>
-
                           <div className="row c2" style={{ marginTop: 12 }}>
                             <button className="extras-toggle"
                                     onClick={() => setEditando(e => ({ ...e, [it.id]: !e[it.id] }))}>
@@ -639,24 +678,17 @@ export default function Cola({ toast }) {
                               </div>
                               <div className="row c2">
                                 {campo(it, 'competicion', 'Competición', { placeholder: 'Liga/Copa/UEFA' })}
+                                {campo(it, 'pais', 'País', { placeholder: 'Inglaterra' })}
+                              </div>
+                              <div className="row c2">
+                                <div className="field">
+                                  <label htmlFor={`fe-${it.id}`}>Fecha</label>
+                                  <input id={`fe-${it.id}`} type="date"
+                                         value={it.fecha_partido ?? ''}
+                                         onChange={e => guardarCampo(it.id, 'fecha_partido', e.target.value)} />
+                                </div>
                                 {campo(it, 'hora', 'Hora', { placeholder: '13:00' })}
                               </div>
-                              <div className="field">
-                                <label htmlFor={`fe-${it.id}`}>Fecha</label>
-                                <input id={`fe-${it.id}`} type="date"
-                                       value={it.fecha_partido ?? ''}
-                                       onChange={e => guardarCampo(it.id, 'fecha_partido', e.target.value)} />
-                              </div>
-                              {competiciones.length > 0 && (
-                                <div className="chips">
-                                  {competiciones.slice(0, 6).map(c => (
-                                    <button key={c} className="chip"
-                                            onClick={() => guardarCampo(it.id, 'competicion', c)}>
-                                      {c}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
 
                               <div className="field" style={{ marginTop: 14 }}>
                                 <label>Mercados de este partido · {susMercados.length}</label>
@@ -710,8 +742,6 @@ export default function Cola({ toast }) {
                                           }} />
 
                               {arbitros.length > 0 && (() => {
-                                // solo los que encajan con lo escrito, y pocos:
-                                // con muchos árbitros la lista se vuelve un muro
                                 const q = (it.arbitro || '').trim().toLowerCase()
                                 const cerca = q
                                   ? arbitros.filter(a => a.nombre.toLowerCase().includes(q))
@@ -767,10 +797,6 @@ export default function Cola({ toast }) {
                               </div>
                               {campo(it, 'bajas', 'Bajas conocidas')}
                               {campo(it, 'notas', 'Notas')}
-                              <p className="ayuda">
-                                Escribe dos o tres letras del árbitro y aparecerán las
-                                coincidencias con su media de amarillas al lado.
-                              </p>
                             </div>
                           )}
 
