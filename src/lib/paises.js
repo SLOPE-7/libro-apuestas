@@ -47,10 +47,10 @@ const MAPA = {
   'copa sudamericana': 'Conmebol',
   'saudi pro league': 'Arabia Saudí',
   'j1 league': 'Japón',
-  'k league': 'Corea del Sur'
-  'Bundesliga': 'Australia'
+  'k league': 'Corea del Sur',
+  'a-league': 'Australia',
+  'a league': 'Australia'
 }
-
 /** Adivina el país por el nombre de la competición. Null si no lo reconoce. */
 export function paisDe(competicion) {
   const t = String(competicion || '').trim().toLowerCase()
