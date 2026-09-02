@@ -48,8 +48,8 @@ const MAPA = {
   'saudi pro league': 'Arabia Saudí',
   'j1 league': 'Japón',
   'k league': 'Corea del Sur',
-  'a-league': 'Australia',
-  'a league': 'Australia'
+  'bundesliga austria': 'Austria',
+  'admiral bundesliga': 'Austria',
 }
 /** Adivina el país por el nombre de la competición. Null si no lo reconoce. */
 export function paisDe(competicion) {
