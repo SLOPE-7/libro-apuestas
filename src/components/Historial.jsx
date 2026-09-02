@@ -21,10 +21,6 @@ const ESTADOS = [
   ['anulada', '∅', 'void']
 ]
 
-const ETIQUETA = {
-  ganada: 'Ganada', perdida: 'Perdida', pendiente: 'Pendiente', cerrada: 'Cerrada'
-}
-
 export default function Historial({ apuestas, casas, onCambio, toast }) {
   const [abierta, setAbierta] = useState(null)
   const [cerrando, setCerrando] = useState(null)
@@ -34,7 +30,30 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   const [verGanadas, setVerGanadas] = useState(true)
 
   const nombreCasa = id => casas.find(c => c.id === id)?.nombre ?? '—'
+
+  /* Sub-mercados de una selección BetBuilder. Con uno solo no hay nada que desglosar. */
   const subs = s => (Array.isArray(s.mercados) && s.mercados.length > 1 ? s.mercados : null)
+
+  /**
+   * Cuenta las partes resueltas de una apuesta.
+   * Antes miraba s.estado incluso cuando la selección tenía sus mercados
+   * dentro, así que el contador mentía en las de un solo mercado.
+   */
+  function progresoDe(sel = []) {
+    let total = 0
+    let hechas = 0
+    for (const s of sel) {
+      const lista = subs(s)
+      if (lista) {
+        total += lista.length
+        hechas += lista.filter(m => m.e && m.e !== 'pendiente').length
+      } else {
+        total += 1
+        if (estadoSeleccion(s) !== 'pendiente') hechas += 1
+      }
+    }
+    return { total, hechas }
+  }
 
   async function tocarMercado(sel, i) {
     const lista = (sel.mercados || []).map(m => ({ ...m }))
@@ -86,7 +105,6 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     )
   }
 
-  /* agrupar por estado */
   const conEstado = apuestas.map(a => ({ ...a, _e: estadoApuesta(a), _r: resultado(a) }))
   const pendientes = conEstado.filter(a => a._e === 'pendiente')
   const ganadas    = conEstado.filter(a => a._e === 'ganada')
@@ -95,7 +113,6 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
 
   const suma = arr => arr.reduce((s, a) => s + a._r, 0)
 
-  /* partidos de fechas pasadas que siguen sin marcar */
   const hoy = new Date().toISOString().slice(0, 10)
   const atrasadas = pendientes.filter(a => a.fecha < hoy)
 
@@ -107,8 +124,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     const producto = cuotaTotal(sel)
     const ajustada = Number(a.cuota_total) > 1 && Math.abs(total / producto - 1) > 0.005
     const abierto = abierta === a.id
-    const partes = sel.flatMap(s => subs(s) || [{ e: s.estado }])
-    const hechas = partes.filter(p => p.e && p.e !== 'pendiente').length
+    const { total: partes, hechas } = progresoDe(sel)
     const sugerido = valorCierre(a)
 
     return (
@@ -126,7 +142,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
               <span>{total.toFixed(2)}</span>
               {ajustada && <span className="marca-casa">casa</span>}
               {e === 'pendiente' && hechas > 0 && (
-                <><span className="sep">·</span><span>{hechas}/{partes.length}</span></>
+                <><span className="sep">·</span><span>{hechas}/{partes}</span></>
               )}
             </div>
           </div>
@@ -245,9 +261,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
           <span className="grupo-tit">{titulo}</span>
           <span className="grupo-datos">
             <span className="contador">{lista.length}</span>
-            {clase !== 'pendiente' && (
-              <span className={total < 0 ? 'neg' : total > 0 ? 'pos' : ''}>{money(total)}</span>
-            )}
+            <span className={total < 0 ? 'neg' : total > 0 ? 'pos' : ''}>{money(total)}</span>
             <span className="chevron">{abierto ? '−' : '+'}</span>
           </span>
         </button>
