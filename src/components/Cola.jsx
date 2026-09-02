@@ -27,12 +27,11 @@ function inicioDe(it) {
   return d
 }
 
-/** Un partido está listo para archivar si terminó y ya fue analizado. */
+/** Se da por jugado dos horas y media después del pitido inicial. */
 function terminado(it, ahora) {
   const ini = inicioDe(it)
   if (!ini) return false
-  const finAprox = ini.getTime() + 2.5 * 60 * 60 * 1000
-  return finAprox <= ahora
+  return ini.getTime() + 2.5 * 60 * 60 * 1000 <= ahora
 }
 
 export default function Cola({ toast }) {
@@ -250,9 +249,9 @@ export default function Cola({ toast }) {
     setItems(l => l.filter(i => i.id !== id))
   }
 
-  /** Vacía los partidos ya jugados. Los sin analizar se quedan. */
+  /** Vacía los partidos ya jugados: si terminaron, ya no sirven. */
   async function limpiarJugados() {
-    const viejos = items.filter(it => terminado(it, ahora) && it.estado !== 'pendiente')
+    const viejos = items.filter(it => terminado(it, ahora))
     if (!viejos.length) return toast('No hay partidos jugados que quitar')
     const ids = viejos.map(v => v.id)
     const { error } = await supabase.from('cola').delete().in('id', ids)
@@ -348,7 +347,7 @@ export default function Cola({ toast }) {
     const ini = inicioDe(it)
     return ini && ini.getTime() <= ahora
   })
-  const jugados = items.filter(it => terminado(it, ahora) && it.estado !== 'pendiente')
+  const jugados = items.filter(it => terminado(it, ahora))
 
   const grupos = Object.values(
     items.reduce((acc, it) => {
