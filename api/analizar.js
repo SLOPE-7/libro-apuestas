@@ -28,6 +28,12 @@ REGLAS INNEGOCIABLES:
 
 12. Cada "razon" en una sola frase corta. Prioriza terminar el JSON completo sobre explicarte a fondo: un JSON incompleto es inservible.
 
+13. Si te dan el país de la competición, úsalo para identificar el partido correcto. Hay ligas homónimas en países distintos y analizar el equipo equivocado invalida todo.
+
+14. Devuelve el nombre de cada mercado EXACTAMENTE como te lo pidieron, sin añadir el nombre del equipo entre paréntesis ni cambiar la redacción. Los nombres se agrupan después para medir aciertos y cualquier variante rompe la cuenta.
+
+15. Si un mercado depende de datos que no tienes (tarjetas sin árbitro, córners sin promedios), dilo en su "razon" y no le pongas una probabilidad alta por defecto.
+
 
 Responde SOLO con un objeto JSON válido, sin texto antes ni después:
 
@@ -48,8 +54,8 @@ export default async function handler(req, res) {
   if (!process.env.ANTHROPIC_API_KEY)
     return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY en las variables de entorno' })
 
-  const {
-    partido, competicion, fecha, mercados,
+   const {
+    partido, competicion, pais, fecha, mercados,
     arbitro, arbAmarillas, arbRojas,
     fase, resultadoIda,
     posLocal, posVisitante,
@@ -80,7 +86,9 @@ export default async function handler(req, res) {
   if (notas) extras.push('Notas del usuario: ' + notas)
 
   const partes = ['Partido: ' + partido]
-  if (competicion) partes.push('Competición: ' + competicion)
+   if (competicion) {
+    partes.push('Competición: ' + competicion + (pais ? ' (' + pais + ')' : ''))
+  }
   if (fecha) partes.push('Fecha: ' + fecha)
   if (extras.length) {
     partes.push('')
