@@ -4,12 +4,56 @@ import CampoLento from './CampoLento'
 import { normalizar } from '../lib/mercados'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
+const signo = v => (v < 0 ? 'neg' : v > 0 ? 'pos' : '')
+
+/** Agrupa por una clave y calcula acierto y yield de cada grupo. */
+function agrupar(lista, clave) {
+  return Object.values(
+    lista.reduce((acc, r) => {
+      const k = clave(r) || '—'
+      if (!acc[k]) acc[k] = { nombre: k, n: 0, ok: 0, suma: 0, cuotas: 0 }
+      acc[k].n++
+      if (r.acerto_ia) acc[k].ok++
+      acc[k].suma += r.acerto_ia ? Number(r.cuota_ia) - 1 : -1
+      acc[k].cuotas += Number(r.cuota_ia)
+      return acc
+    }, {})
+  ).map(g => ({ ...g, yield: g.suma / g.n, cuotaMedia: g.cuotas / g.n }))
+   .sort((a, b) => b.suma - a.suma)
+}
+
+function Tabla({ filas, etiqueta, minimo }) {
+  const utiles = filas.filter(f => f.n >= minimo)
+  if (!utiles.length) return null
+  return (
+    <div className="card">
+      <table>
+        <tbody>
+          <tr><th>{etiqueta}</th><th>N</th><th>Acierto</th><th>Cuota</th><th>Yield</th></tr>
+          {utiles.map(f => (
+            <tr key={f.nombre}>
+              <td>{f.nombre}</td>
+              <td>{f.n}</td>
+              <td>{pct(f.ok / f.n)}</td>
+              <td>{f.cuotaMedia.toFixed(2)}</td>
+              <td className={signo(f.yield)}>{pct(f.yield)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="ayuda">
+        Solo grupos con {minimo} registros o más. Por debajo de treinta, estos números
+        siguen siendo ruido: un grupo al 100% con cinco apuestas no dice nada.
+      </p>
+    </div>
+  )
+}
 
 export default function Sombra({ toast }) {
   const [registros, setRegistros] = useState([])
   const [abierto, setAbierto] = useState(null)
   const [filtro, setFiltro] = useState('todos')
-  const [verMercados, setVerMercados] = useState(false)
+  const [panel, setPanel] = useState(null)
 
   async function recargar() {
     const { data } = await supabase.from('sombra')
@@ -42,7 +86,6 @@ export default function Sombra({ toast }) {
     toast('Análisis borrado')
   }
 
-  /* agrupado por partido y fecha */
   const grupos = Object.values(
     registros.reduce((acc, r) => {
       const fecha = String(r.creado_en).slice(0, 10)
@@ -75,20 +118,32 @@ export default function Sombra({ toast }) {
   const cuotaMedia = conCuota.length
     ? conCuota.reduce((s, r) => s + Number(r.cuota_ia), 0) / conCuota.length : null
 
-  /* rendimiento por tipo de mercado, con los nombres ya unificados */
-  const porMercado = Object.values(
-    conCuota.reduce((acc, r) => {
-      const k = normalizar(r.mercado_ia)
-      if (!acc[k]) acc[k] = { mercado: k, n: 0, ok: 0, suma: 0, cuotas: 0 }
-      acc[k].n++
-      if (r.acerto_ia) acc[k].ok++
-      acc[k].suma += r.acerto_ia ? Number(r.cuota_ia) - 1 : -1
-      acc[k].cuotas += Number(r.cuota_ia)
-      return acc
-    }, {})
-  ).map(m => ({ ...m, yield: m.suma / m.n, cuotaMedia: m.cuotas / m.n }))
-   .filter(m => m.n >= 3)
-   .sort((a, b) => b.yield - a.yield)
+  /* Familia de mercado: agrupa "Más de 8.5 córners" y "Más de 9.5 córners" juntos. */
+  const familiaDe = m => {
+    const t = normalizar(m).toLowerCase()
+    const lado = t.startsWith('menos') ? 'under' : t.startsWith('más') ? 'over' : ''
+    if (t.includes('córner')) return `córners ${lado}`
+    if (t.includes('tarjeta')) return `tarjetas ${lado}`
+    if (t.includes('primera mitad')) return `1ª mitad ${lado}`
+    if (t.includes('gol')) return `goles ${lado}`
+    if (t.includes('doble oportunidad')) return 'doble oportunidad'
+    if (t.includes('hándicap')) return 'hándicap'
+    if (t.startsWith('1x2')) return '1X2'
+    if (t.includes('ambos')) return 'ambos marcan'
+    if (t.includes('clasifica')) return 'se clasifica'
+    return normalizar(m)
+  }
+
+  const porMercado    = agrupar(conCuota, r => normalizar(r.mercado_ia))
+  const porFamilia    = agrupar(conCuota, r => familiaDe(r.mercado_ia))
+  const porLiga       = agrupar(conCuota, r => r.competicion)
+  const porConfianza  = agrupar(conCuota, r => {
+    const c = Number(r.confianza)
+    if (!c) return 'sin confianza'
+    if (c < 50) return 'confianza baja (<50)'
+    if (c < 65) return 'confianza media (50-64)'
+    return 'confianza alta (65+)'
+  })
 
   if (!registros.length) {
     return (
@@ -99,6 +154,24 @@ export default function Sombra({ toast }) {
           Analiza partidos en la Cola y guárdalos aquí.
         </div>
       </section>
+    )
+  }
+
+  const panelBtn = (id, titulo, filas, minimo) => {
+    const utiles = filas.filter(f => f.n >= minimo)
+    if (!utiles.length) return null
+    const ab = panel === id
+    return (
+      <>
+        <button className="grupo-cab" onClick={() => setPanel(ab ? null : id)}>
+          <span className="grupo-tit">{titulo}</span>
+          <span className="grupo-datos">
+            <span className="contador">{utiles.length}</span>
+            <span className="chevron">{ab ? '−' : '+'}</span>
+          </span>
+        </button>
+        {ab && <Tabla filas={filas} etiqueta={titulo} minimo={minimo} />}
+      </>
     )
   }
 
@@ -128,9 +201,7 @@ export default function Sombra({ toast }) {
         <div className="fig"><div className="k">Con cuota</div><div className="v">{conCuota.length}</div></div>
         <div className="fig">
           <div className="k">Yield</div>
-          <div className={`v ${yieldSombra < 0 ? 'neg' : yieldSombra > 0 ? 'pos' : ''}`}>
-            {pct(yieldSombra)}
-          </div>
+          <div className={`v ${signo(yieldSombra)}`}>{pct(yieldSombra)}</div>
         </div>
         <div className="fig">
           <div className="k">Cuota media</div>
@@ -170,39 +241,23 @@ export default function Sombra({ toast }) {
         </div>
       )}
 
-      {porMercado.length > 0 && (
+      {conCuota.length > 0 && (
         <>
-          <button className="grupo-cab" onClick={() => setVerMercados(v => !v)}>
-            <span className="grupo-tit">Rendimiento por mercado</span>
-            <span className="grupo-datos">
-              <span className="contador">{porMercado.length}</span>
-              <span className="chevron">{verMercados ? '−' : '+'}</span>
-            </span>
-          </button>
-          {verMercados && (
-            <div className="card">
-              <table>
-                <tbody>
-                  <tr><th>Mercado</th><th>N</th><th>Acierto</th><th>Cuota</th><th>Yield</th></tr>
-                  {porMercado.map(m => (
-                    <tr key={m.mercado}>
-                      <td>{m.mercado}</td>
-                      <td>{m.n}</td>
-                      <td>{pct(m.ok / m.n)}</td>
-                      <td>{m.cuotaMedia.toFixed(2)}</td>
-                      <td className={m.yield < 0 ? 'neg' : m.yield > 0 ? 'pos' : ''}>
-                        {pct(m.yield)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="ayuda">
-                Solo mercados con tres registros o más. Con menos de treinta por mercado
-                estos números todavía son ruido.
-              </p>
-            </div>
-          )}
+          <div className="sec-label" style={{ marginTop: 20 }}>
+            <span className="eyebrow">Desglose</span>
+          </div>
+          {panelBtn('familia', 'Por tipo de mercado', porFamilia, 5)}
+          {panelBtn('mercado', 'Por mercado exacto', porMercado, 5)}
+          {panelBtn('liga', 'Por competición', porLiga, 5)}
+          {panelBtn('confianza', 'Por confianza declarada', porConfianza, 5)}
+
+          <div className="flag" style={{ marginTop: 10 }}>
+            <strong>Cómo leer esto.</strong> Un grupo con pocos registros y acierto altísimo
+            no es una veta: es azar. Circulan capturas de tablas así en redes, pero suelen
+            enseñar solo los grupos ganadores y esconder el resto. Aquí ves todos los tuyos,
+            incluidos los que pierden. Fíjate en el yield, no en el acierto, y no des nada
+            por bueno hasta pasar de treinta registros en ese grupo.
+          </div>
         </>
       )}
 
