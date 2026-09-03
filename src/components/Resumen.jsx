@@ -6,11 +6,18 @@ const pct = v => (v === null || v === undefined ? '—' : (v * 100).toFixed(1) +
 const signo = v => (v < 0 ? 'neg' : v > 0 ? 'pos' : '')
 
 export default function Resumen({ r }) {
-  const figs = [
+  /* Dos cifras mandan y cuatro acompañan. Antes las seis pesaban igual y
+     el rendimiento competía en tamaño con la banca, que es lo que de verdad
+     tienes. El color del rendimiento se guarda hasta que haya muestra: con
+     pocas apuestas, pintarlo de verde premia la suerte. */
+  const principales = [
     ['Banca actual', money(r.banca), signo(r.banca - r.inicial)],
-    ['Resultado neto', money(r.neto), signo(r.neto)],
+    ['Resultado neto', money(r.neto), signo(r.neto)]
+  ]
+  const hayMuestra = r.resueltas >= 100
+  const secundarias = [
     ['Total apostado', money(r.apostado), ''],
-    ['Rendimiento', pct(r.yield), r.yield === null ? '' : signo(r.yield)],
+    ['Rendimiento', pct(r.yield), hayMuestra && r.yield !== null ? signo(r.yield) : ''],
     ['Resueltas', String(r.resueltas), ''],
     ['Acierto', pct(r.acierto), '']
   ]
@@ -21,8 +28,17 @@ export default function Resumen({ r }) {
 
   return (
     <section>
-      <div className="figs">
-        {figs.map(([k, v, c]) => (
+      <div className="figs figs-alta">
+        {principales.map(([k, v, c]) => (
+          <div className="fig" key={k}>
+            <div className="k">{k}</div>
+            <div className={`v ${c}`}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="figs figs-baja">
+        {secundarias.map(([k, v, c]) => (
           <div className="fig" key={k}>
             <div className="k">{k}</div>
             <div className={`v ${c}`}>{v}</div>
