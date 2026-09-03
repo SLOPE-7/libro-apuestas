@@ -10,13 +10,14 @@ import Sombra from './components/Sombra'
 import Analisis from './components/Analisis'
 import Casas from './components/Casas'
 
+/* Cinco pestañas, no siete. Cola y Sombra son el mismo circuito: lo que
+   entra al modelo y cómo le fue a lo que salió. Tenerlas separadas obligaba
+   a saltar entre las dos para entender una sola cosa. */
 const TABS = [
   ['resumen', 'Resumen'],
   ['nueva', 'Registrar'],
   ['historial', 'Historial'],
-  ['cola', 'Cola'],
-  ['sombra', 'Sombra'],
-  ['analisis', 'Análisis'],
+  ['modelo', 'Modelo'],
   ['casas', 'Casas']
 ]
 
@@ -26,6 +27,7 @@ export default function App() {
   const [movimientos, setMovimientos] = useState([])
   const [apuestas, setApuestas] = useState([])
   const [tab, setTab] = useState('resumen')
+  const [vistaModelo, setVistaModelo] = useState('cola')
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
 
@@ -97,12 +99,31 @@ export default function App() {
             {tab === 'historial' && (
               <Historial apuestas={apuestas} casas={casas} onCambio={cargar} toast={toast} />
             )}
-            {tab === 'cola' && <Cola toast={toast} />}
-            {tab === 'sombra' && <Sombra toast={toast} />}
-            {tab === 'analisis' && <Analisis toast={toast} />}
+
+            {tab === 'modelo' && (
+              <>
+                <div className="segmented" style={{ marginTop: 22 }}>
+                  <button className={vistaModelo === 'cola' ? 'on' : ''}
+                          onClick={() => { setVistaModelo('cola'); window.scrollTo(0, 0) }}>
+                    Cola
+                  </button>
+                  <button className={vistaModelo === 'sombra' ? 'on' : ''}
+                          onClick={() => { setVistaModelo('sombra'); window.scrollTo(0, 0) }}>
+                    Sombra
+                  </button>
+                </div>
+                {vistaModelo === 'cola' ? <Cola toast={toast} /> : <Sombra toast={toast} />}
+              </>
+            )}
+
             {tab === 'casas' && (
-              <Casas casas={casas} movimientos={movimientos} resumen={r}
-                     onCambio={cargar} toast={toast} />
+              <>
+                <Casas casas={casas} movimientos={movimientos} resumen={r}
+                       onCambio={cargar} toast={toast} />
+                {/* La calculadora de comisión vive aquí porque habla de lo
+                    mismo que esta pantalla: lo que cobra la casa. */}
+                <Analisis toast={toast} />
+              </>
             )}
           </>}
 
