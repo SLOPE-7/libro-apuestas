@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { cuotaTotal, filtro, kelly } from '../lib/calc'
+import { cuotaTotal, filtro, kelly, evaluarCombinada, REGLAS } from '../lib/calc'
 import { parseCupon } from '../lib/parseCupon'
 import AutoInput from './AutoInput'
 
@@ -41,6 +41,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   const [cuotaCasa, setCuotaCasa] = useState('')
   const [legs, setLegs]           = useState([legVacia()])
   const [guardando, setGuardando] = useState(false)
+  /* Cuando la apuesta no pasa las reglas, guardar exige un segundo toque.
+     La regla no prohíbe: obliga a decidirlo a conciencia. */
+  const [forzar, setForzar]       = useState(false)
 
   const [pegando, setPegando] = useState(false)
   const [cupon, setCupon]     = useState('')
@@ -143,6 +146,21 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
   const f = esSimple ? filtro(miProb, Number(legs[0].cuota)) : null
   const k = esSimple ? kelly(miProb, Number(legs[0].cuota)) : 0
 
+  /* El veredicto de la combinada. Antes esto no existía: filtro() y kelly()
+     se apagaban solos en cuanto había más de una pata, o sea justo donde
+     el margen se acumula y la varianza se dispara. */
+  const ev = tipo === 'combinada'
+    ? evaluarCombinada(legs, manual > 1 ? manual : null)
+    : null
+
+  const faltanProbs = ev && !ev.completa
+  const bloquea = (f && !f.ok) || (ev && ev.juzgable && !ev.ok)
+
+  /* Cualquier cambio real invalida un "guardar igual" ya concedido. */
+  const firma = legs.map(l => `${l.cuota}|${l.mi_prob}|${l.mercados.length}`).join(';')
+             + `|${cuotaCasa}|${tipo}`
+  useEffect(() => { setForzar(false) }, [firma])
+
   const nombres  = legs.map(l => nombre(l).toLowerCase()).filter(Boolean)
   const repetido = tipo === 'combinada' && new Set(nombres).size < nombres.length
 
@@ -162,6 +180,11 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
     if (!casaId)         return toast('Elige la casa antes de guardar')
     if (!(s > 0))        return toast('Falta el monto apostado')
     if (!validas.length) return toast('Falta al menos un partido con su cuota')
+
+    if (bloquea && !forzar) {
+      setForzar(true)
+      return toast('No pasa tus reglas. Toca guardar otra vez si aun así la quieres')
+    }
 
     setGuardando(true)
     const { data: apuesta, error: e1 } = await supabase.from('apuestas')
@@ -189,7 +212,7 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
       return toast('No se pudo guardar: ' + e2.message)
     }
 
-    setStake(''); setCuotaCasa(''); setLegs([legVacia()]); setTipo('simple')
+    setStake(''); setCuotaCasa(''); setLegs([legVacia()]); setTipo('simple'); setForzar(false)
     toast('Guardada')
     onGuardado()
   }
@@ -260,86 +283,78 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
       </div>
 
       <div className="card">
-        {legs.map((l, i) => (
-          <div className="leg" key={i}>
-            {tipo === 'combinada' && (
-              <div className="leg-head">
-                <span className="leg-n">Partido {i + 1}</span>
-                {legs.length > 1 &&
-                  <button className="x" onClick={() => delLeg(i)}
-                          aria-label={`Quitar partido ${i + 1}`}>×</button>}
-              </div>
-            )}
-
-            <div className="enfrenta">
-              <div className="field">
-                <label htmlFor={`loc${i}`}>Local</label>
-                <AutoInput id={`loc${i}`} value={l.local} opciones={histEquipos}
-                           onChange={v => up(i, 'local', v)} placeholder="Equipo A" />
-              </div>
-              <span className="vs" aria-hidden="true">vs</span>
-              <div className="field">
-                <label htmlFor={`vis${i}`}>Visitante</label>
-                <AutoInput id={`vis${i}`} value={l.visitante} opciones={histEquipos}
-                           onChange={v => up(i, 'visitante', v)} placeholder="Equipo B" />
-              </div>
-            </div>
-
-            {l.mercados.map((m, j) => (
-              <div className="merc" key={j}>
-                <div className="merc-head">
-                  <span className="merc-n">
-                    {j === 0 ? 'Mercado' : `Mercado ${j + 1} · mismo partido`}
-                  </span>
-                  {l.mercados.length > 1 &&
-                    <button className="x" onClick={() => delMerc(i, j)}
-                            aria-label="Quitar mercado">×</button>}
+        {legs.map((l, i) => {
+          const floja = ev?.flojas?.includes(i)
+          return (
+            <div className={`leg ${floja ? 'leg-floja' : ''}`} key={i}>
+              {tipo === 'combinada' && (
+                <div className="leg-head">
+                  <span className="leg-n">Partido {i + 1}</span>
+                  {legs.length > 1 &&
+                    <button className="x" onClick={() => delLeg(i)}
+                            aria-label={`Quitar partido ${i + 1}`}>×</button>}
                 </div>
+              )}
 
-                <div className="row tight">
-                  <AutoInput value={m.tipo} opciones={TIPOS} ariaLabel="Tipo de mercado"
-                             onChange={v => upMerc(i, j, 'tipo', v)}
-                             placeholder="Total de goles" />
+              <div className="enfrenta">
+                <div className="field">
+                  <label htmlFor={`loc${i}`}>Local</label>
+                  <AutoInput id={`loc${i}`} value={l.local} opciones={histEquipos}
+                             onChange={v => up(i, 'local', v)} placeholder="Equipo A" />
                 </div>
-                <div className="row tight">
-                  <AutoInput value={m.seleccion} opciones={histSel} ariaLabel="Selección"
-                             onChange={v => upMerc(i, j, 'seleccion', v)}
-                             placeholder="Más de 2.5" />
+                <span className="vs" aria-hidden="true">vs</span>
+                <div className="field">
+                  <label htmlFor={`vis${i}`}>Visitante</label>
+                  <AutoInput id={`vis${i}`} value={l.visitante} opciones={histEquipos}
+                             onChange={v => up(i, 'visitante', v)} placeholder="Equipo B" />
                 </div>
+              </div>
 
-                {atajos(m.tipo).length > 0 && (
-                  <div className="chips">
-                    {atajos(m.tipo).map(op => (
-                      <button key={op} className={`chip ${m.seleccion === op ? 'on' : ''}`}
-                              onClick={() => upMerc(i, j, 'seleccion', op)}>{op}</button>
-                    ))}
+              {l.mercados.map((m, j) => (
+                <div className="merc" key={j}>
+                  <div className="merc-head">
+                    <span className="merc-n">
+                      {j === 0 ? 'Mercado' : `Mercado ${j + 1} · mismo partido`}
+                    </span>
+                    {l.mercados.length > 1 &&
+                      <button className="x" onClick={() => delMerc(i, j)}
+                              aria-label="Quitar mercado">×</button>}
                   </div>
-                )}
-              </div>
-            ))}
 
-            <button className="mini" onClick={() => addMerc(i)}>
-              + Otro mercado en este partido
-            </button>
+                  <div className="row tight">
+                    <AutoInput value={m.tipo} opciones={TIPOS} ariaLabel="Tipo de mercado"
+                               onChange={v => upMerc(i, j, 'tipo', v)}
+                               placeholder="Total de goles" />
+                  </div>
+                  <div className="row tight">
+                    <AutoInput value={m.seleccion} opciones={histSel} ariaLabel="Selección"
+                               onChange={v => upMerc(i, j, 'seleccion', v)}
+                               placeholder="Más de 2.5" />
+                  </div>
 
-            <div className="row c2" style={{ marginTop: 14 }}>
-              <div className="field">
-                <label htmlFor={`c${i}`}>
-                  {l.mercados.length > 1 ? 'Cuota combinada' : 'Cuota'}
+                  {atajos(m.tipo).length > 0 && (
+                    <div className="chips">
+                      {atajos(m.tipo).map(op => (
+                        <button key={op} className={`chip ${m.seleccion === op ? 'on' : ''}`}
+                                onClick={() => upMerc(i, j, 'seleccion', op)}>{op}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <button className="mini" onClick={() => addMerc(i)}>
+                + Otro mercado en este partido
+              </button>
+
+              {/* La probabilidad va antes que la cuota a propósito: si ya viste
+                  el precio, tu estimación deja de ser tuya. */}
+              <div className="field" style={{ marginTop: 14 }}>
+                <label htmlFor={`x${i}`}>
+                  {tipo === 'simple'
+                    ? 'Tu probabilidad estimada'
+                    : `Tu probabilidad para el partido ${i + 1}`}
                 </label>
-                <input id={`c${i}`} inputMode="decimal" value={l.cuota}
-                       onChange={e => up(i, 'cuota', e.target.value)} placeholder="1.85" />
-              </div>
-              <div className="field">
-                <label htmlFor={`y${i}`}>Cuota de cierre</label>
-                <input id={`y${i}`} inputMode="decimal" value={l.cuota_cierre}
-                       onChange={e => up(i, 'cuota_cierre', e.target.value)} placeholder="opcional" />
-              </div>
-            </div>
-
-            {tipo === 'simple' && (
-              <div className="field">
-                <label htmlFor={`x${i}`}>Tu probabilidad estimada</label>
                 <div className="con-sufijo">
                   <input id={`x${i}`} inputMode="decimal" value={l.mi_prob}
                          onChange={e => up(i, 'mi_prob', e.target.value)}
@@ -347,9 +362,31 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
                   <span className="sufijo">%</span>
                 </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              <div className="row c2">
+                <div className="field">
+                  <label htmlFor={`c${i}`}>
+                    {l.mercados.length > 1 ? 'Cuota combinada' : 'Cuota'}
+                  </label>
+                  <input id={`c${i}`} inputMode="decimal" value={l.cuota}
+                         onChange={e => up(i, 'cuota', e.target.value)} placeholder="1.85" />
+                </div>
+                <div className="field">
+                  <label htmlFor={`y${i}`}>Cuota de cierre</label>
+                  <input id={`y${i}`} inputMode="decimal" value={l.cuota_cierre}
+                         onChange={e => up(i, 'cuota_cierre', e.target.value)} placeholder="opcional" />
+                </div>
+              </div>
+
+              {floja && (
+                <p className="ayuda" style={{ color: 'var(--loss)' }}>
+                  Esta pata no pasaría los filtros como apuesta simple. Metida en una
+                  combinada no mejora: solo se le pega a las demás.
+                </p>
+              )}
+            </div>
+          )
+        })}
 
         {tipo === 'combinada' &&
           <button className="ghost" onClick={addLeg}>+ Añadir otro partido</button>}
@@ -412,6 +449,18 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
                     de la casa otra vez.</>}
               {desvia && <> El producto de las cuotas daría {producto.toFixed(2)}.</>}
             </p>
+
+            {/* Ese porcentaje es el de la casa, y lleva su comisión dentro.
+                Enseñar el descuento es el punto entero de la pantalla. */}
+            {ev && ev.n > 1 && (
+              <p className="medidor-nota" style={{ marginTop: 8 }}>
+                Ese <b>{(ev.probCasa * 100).toFixed(1)}%</b> es el que te paga la casa, con su
+                comisión dentro. Descontando alrededor de un {(REGLAS.margenPorPata * 100).toFixed(0)}%
+                por pata, la probabilidad honesta ronda el <b>{(ev.probHonesta * 100).toFixed(1)}%</b>:
+                estás pagando un <b>{(ev.margen * 100).toFixed(1)}%</b> de margen acumulado antes
+                de que ruede el balón.
+              </p>
+            )}
           </>
         )}
       </div>
@@ -421,6 +470,27 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
           <strong>{f.ok ? 'Pasa los filtros.' : 'No pasa los filtros.'}</strong> {f.texto}
           {f.ok && banca > 0 &&
             <> · Stake sugerido (¼ Kelly): <strong>L{(banca * k).toFixed(2)}</strong></>}
+        </div>
+      )}
+
+      {ev && faltanProbs && ev.patas <= REGLAS.patasMax && (
+        <div className="flag">
+          <strong>Faltan tus probabilidades.</strong> Sin estimar cada partido no se puede
+          saber si esta combinada vale el precio. Es el único dato que la app no puede
+          sacar sola.
+        </div>
+      )}
+
+      {ev && ev.juzgable && (
+        <div className="flag">
+          <strong>{ev.ok ? 'La combinada pasa tus reglas.' : 'No pasa tus reglas.'}</strong>{' '}
+          {ev.ok
+            ? <>Edge del {(ev.edgeTotal * 100).toFixed(1)}%
+                {banca > 0 &&
+                  <> · Stake sugerido: <strong>L{(banca * ev.kelly).toFixed(2)}</strong> (tope
+                     del {(REGLAS.topeParlay * 100).toFixed(0)}% de banca, más bajo que en
+                     simples porque una combinada falla entera)</>}.</>
+            : <>{ev.motivos.join(' · ')}.</>}
         </div>
       )}
 
@@ -441,8 +511,20 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
         )}
       </div>
 
-      <button className="act" onClick={guardar} disabled={guardando}>
-        {guardando ? 'Guardando…' : 'Guardar en el libro'}
+      {forzar && (
+        <div className="flag">
+          <strong>Vas a registrarla igual.</strong> Está bien, pero queda anotada como lo
+          que es. Toca guardar otra vez para confirmar.
+        </div>
+      )}
+
+      <button className={`act ${bloquea ? 'act-riesgo' : ''}`}
+              onClick={guardar} disabled={guardando}>
+        {guardando
+          ? 'Guardando…'
+          : bloquea && forzar
+            ? 'Guardar de todos modos'
+            : 'Guardar en el libro'}
       </button>
     </section>
   )
