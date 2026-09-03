@@ -15,6 +15,10 @@ export default function Resumen({ r }) {
     ['Acierto', pct(r.acierto), '']
   ]
 
+  /* El yield con pocas apuestas es ruido. Se enseña el intervalo, no la cifra sola. */
+  const rango = r.rango
+  const rangoAmplio = rango && (rango.alto - rango.bajo) > 0.30
+
   return (
     <section>
       <div className="figs">
@@ -25,6 +29,22 @@ export default function Resumen({ r }) {
           </div>
         ))}
       </div>
+
+      {rangoAmplio && (
+        <div className="flag">
+          <strong>Ese rendimiento no significa lo que parece.</strong> Con {rango.n} apuestas
+          resueltas, tu rendimiento real está en algún punto entre {pct(rango.bajo)} y{' '}
+          {pct(rango.alto)}. El rango es tan ancho que la cifra de arriba no distingue
+          entre tener ventaja y haber tenido suerte.
+        </div>
+      )}
+
+      {r.anuladas > 0 && (
+        <div className="bet-meta" style={{ marginBottom: 14 }}>
+          {r.anuladas} {r.anuladas === 1 ? 'apuesta anulada' : 'apuestas anuladas'} fuera del
+          cálculo: la casa devolvió el dinero, así que no son ni acierto ni fallo.
+        </div>
+      )}
 
       {r.curva.length > 1 && (
         <div className="card">
@@ -39,7 +59,7 @@ export default function Resumen({ r }) {
                 <ReferenceLine y={r.inicial} stroke="#9EA093" strokeDasharray="3 3" />
                 <Tooltip
                   formatter={v => money(v)}
-                  labelFormatter={i => `Apuesta ${i}`}
+                  labelFormatter={(i, p) => p?.[0]?.payload?.etiqueta ?? `Apuesta ${i}`}
                   contentStyle={{
                     background: '#F6F5F1', border: '1px solid #9EA093',
                     borderRadius: 0, fontSize: 12
@@ -50,7 +70,8 @@ export default function Resumen({ r }) {
             </ResponsiveContainer>
           </div>
           <div className="bet-meta" style={{ marginTop: 4 }}>
-            La línea punteada es tu punto de partida
+            La línea punteada es tu punto de partida. Los depósitos y retiros también
+            mueven la curva.
           </div>
         </div>
       )}
@@ -86,6 +107,10 @@ export default function Resumen({ r }) {
             </tr>
           </tbody>
         </table>
+        <div className="bet-meta" style={{ marginTop: 8 }}>
+          Cuenta las patas, no las líneas: una selección con varios mercados del mismo
+          partido es combinada.
+        </div>
       </div>
 
       <div className="card">
@@ -108,6 +133,15 @@ export default function Resumen({ r }) {
 
       {r.resueltas > 0 && (
         <div className="verdict">{diagnostico(r)}</div>
+      )}
+
+      {r.simples.n >= 5 && r.simples.acierto > 0.6 && r.simples.neto < 0 && (
+        <div className="flag">
+          <strong>Aciertas mucho y pierdes dinero en las simples.</strong>{' '}
+          {pct(r.simples.acierto)} de acierto y {money(r.simples.neto)} de resultado
+          significa que estás pagando cuotas demasiado bajas para lo que aciertas.
+          El acierto no paga; el precio sí.
+        </div>
       )}
 
       {r.parlays.n >= 5 && r.parlays.neto < r.simples.neto && (
