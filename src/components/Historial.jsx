@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   cuotaApuesta, cuotaTotal, estadoApuesta, estadoSeleccion,
-  resultado, valorCierre, tieneAnuladaParcial
+  resultado, valorCierre, tieneAnuladaParcial, patasApuesta
 } from '../lib/calc'
 
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v).toFixed(2)
@@ -27,7 +27,12 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   const [importe, setImporte] = useState('')
   const [verPerdidas, setVerPerdidas] = useState(false)
   const [verCerradas, setVerCerradas] = useState(false)
+  const [verAnuladas, setVerAnuladas] = useState(false)
   const [verGanadas, setVerGanadas] = useState(true)
+  /* Confirmación de borrado: guarda el id de la apuesta que está esperando el sí. */
+  const [confirmando, setConfirmando] = useState(null)
+  /* Último cambio de marcado, para poder revertirlo de un toque. */
+  const [deshacer, setDeshacer] = useState(null)
 
   const nombreCasa = id => casas.find(c => c.id === id)?.nombre ?? '—'
 
@@ -56,20 +61,35 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   }
 
   async function tocarMercado(sel, i) {
-    const lista = (sel.mercados || []).map(m => ({ ...m }))
+    const previo = (sel.mercados || []).map(m => ({ ...m }))
+    const lista = previo.map(m => ({ ...m }))
     const actual = lista[i].e || 'pendiente'
     lista[i].e = CICLO[(CICLO.indexOf(actual) + 1) % CICLO.length]
     const { error } = await supabase.from('selecciones')
       .update({ mercados: lista }).eq('id', sel.id)
     if (error) return toast('No se pudo actualizar: ' + error.message)
+    setDeshacer({ id: sel.id, campo: 'mercados', valor: previo, texto: lista[i].t || 'mercado' })
     onCambio()
   }
 
   async function marcar(sel, valor) {
+    const previo = sel.estado ?? 'pendiente'
     const nuevo = sel.estado === valor ? 'pendiente' : valor
     const { error } = await supabase.from('selecciones')
       .update({ estado: nuevo }).eq('id', sel.id)
     if (error) return toast('No se pudo actualizar: ' + error.message)
+    setDeshacer({ id: sel.id, campo: 'estado', valor: previo, texto: sel.partido || 'selección' })
+    onCambio()
+  }
+
+  /* Revierte el último marcado. Sin esto, un toque mal dado corrompe los números en silencio. */
+  async function revertir() {
+    if (!deshacer) return
+    const { error } = await supabase.from('selecciones')
+      .update({ [deshacer.campo]: deshacer.valor }).eq('id', deshacer.id)
+    if (error) return toast('No se pudo deshacer: ' + error.message)
+    setDeshacer(null)
+    toast('Cambio revertido')
     onCambio()
   }
 
@@ -91,6 +111,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   async function borrar(id) {
     const { error } = await supabase.from('apuestas').delete().eq('id', id)
     if (error) return toast('No se pudo borrar: ' + error.message)
+    setConfirmando(null)
     toast('Asiento borrado'); onCambio()
   }
 
@@ -110,6 +131,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   const ganadas    = conEstado.filter(a => a._e === 'ganada')
   const perdidas   = conEstado.filter(a => a._e === 'perdida')
   const cerradas   = conEstado.filter(a => a._e === 'cerrada')
+  const anuladas   = conEstado.filter(a => a._e === 'anulada')
 
   const suma = arr => arr.reduce((s, a) => s + a._r, 0)
 
@@ -126,6 +148,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     const abierto = abierta === a.id
     const { total: partes, hechas } = progresoDe(sel)
     const sugerido = valorCierre(a)
+    const patas = patasApuesta(a)
 
     return (
       <article className={`bet compacta ${e} ${abierto ? 'abierta' : ''}`} key={a.id}>
@@ -137,7 +160,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
               <span className="sep">·</span>
               <span>{nombreCasa(a.casa_id)}</span>
               <span className="sep">·</span>
-              <span>{sel.length === 1 ? '1 sel' : `${sel.length} sels`}</span>
+              <span>{patas === 1 ? '1 pata' : `${patas} patas`}</span>
               <span className="sep">·</span>
               <span>{total.toFixed(2)}</span>
               {ajustada && <span className="marca-casa">casa</span>}
@@ -156,6 +179,13 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
 
         {abierto && (
           <div className="bet-cuerpo">
+            {e === 'anulada' && (
+              <div className="cierre-info">
+                Anulada entera. La casa devolvió lo apostado, así que no cuenta
+                ni en tu acierto ni en tu rendimiento.
+              </div>
+            )}
+
             {sel.map(s => {
               const lista = subs(s)
               const es = estadoSeleccion(s)
@@ -238,13 +268,26 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
               </div>
             )}
 
+            {confirmando === a.id && (
+              <div className="flag" style={{ margin: '12px 0 0' }}>
+                <strong>¿Borrar este asiento?</strong> Se va también el detalle de sus
+                selecciones y no se puede recuperar.
+                <div className="row c2" style={{ marginTop: 10 }}>
+                  <button className="act" onClick={() => borrar(a.id)}>Sí, borrar</button>
+                  <button className="ghost" onClick={() => setConfirmando(null)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+
             <div className="bet-pie">
               {e === 'pendiente' && cerrando !== a.id && (
                 <button className="tiny" onClick={() => { setCerrando(a.id); setImporte('') }}>
                   Cerrar apuesta
                 </button>
               )}
-              <button className="tiny" onClick={() => borrar(a.id)}>Borrar asiento</button>
+              {confirmando !== a.id && (
+                <button className="tiny" onClick={() => setConfirmando(a.id)}>Borrar asiento</button>
+              )}
             </div>
           </div>
         )}
@@ -280,6 +323,14 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
         </p>
       </header>
 
+      {deshacer && (
+        <div className="cierre-info" style={{ marginBottom: 12 }}>
+          Marcaste <b>{deshacer.texto}</b>.
+          <button className="mini" onClick={revertir}>Deshacer</button>
+          <button className="mini" onClick={() => setDeshacer(null)}>Está bien</button>
+        </div>
+      )}
+
       {atrasadas.length > 0 && (
         <div className="flag">
           <strong>{atrasadas.length} {atrasadas.length === 1 ? 'apuesta' : 'apuestas'} de
@@ -303,6 +354,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
       <div style={{ marginTop: 18 }}>
         {grupo('Ganadas', ganadas, verGanadas, () => setVerGanadas(v => !v), 'ganada')}
         {grupo('Cerradas', cerradas, verCerradas, () => setVerCerradas(v => !v), 'cerrada')}
+        {grupo('Anuladas', anuladas, verAnuladas, () => setVerAnuladas(v => !v), 'anulada')}
         {grupo('Perdidas', perdidas, verPerdidas, () => setVerPerdidas(v => !v), 'perdida')}
       </div>
     </section>
