@@ -50,6 +50,12 @@ export default function Cola({ toast }) {
   const [ahora, setAhora] = useState(Date.now())
 
   const [pegando, setPegando] = useState(false)
+  /* El formulario de añadir arranca cerrado. Antes ocupaba media pantalla
+     con las barras y los chips aunque solo vinieras a mirar la cola. */
+  const [anadiendo, setAnadiendo] = useState(false)
+  const [verMercados, setVerMercados] = useState(false)
+  const [confirmarBorrar, setConfirmarBorrar] = useState(null)
+  const [confirmarLimpiar, setConfirmarLimpiar] = useState(false)
   const [cupon, setCupon] = useState('')
   const [ligaCupon, setLigaCupon] = useState('')
   const [paisCupon, setPaisCupon] = useState('')
@@ -179,7 +185,10 @@ export default function Cola({ toast }) {
   async function anadir() {
     if (!nuevo.local.trim() || !nuevo.visitante.trim())
       return toast('Escribe los dos equipos')
-    if (!mercados.length) return toast('Elige al menos un mercado')
+    if (!mercados.length) {
+      setVerMercados(true)
+      return toast('Elige al menos un mercado')
+    }
 
     const liga = nuevo.competicion.trim() || null
     const pais = nuevo.pais.trim() || paisPara(liga) || null
@@ -202,6 +211,8 @@ export default function Cola({ toast }) {
       pais: nuevo.pais, fecha_partido: '', hora: ''
     })
     setMercados([])
+    setVerMercados(false)
+    setAnadiendo(false)
     toast('Añadido a la cola')
   }
 
@@ -244,6 +255,7 @@ export default function Cola({ toast }) {
   async function borrar(id) {
     const { error } = await supabase.from('cola').delete().eq('id', id)
     if (error) return toast('No se pudo borrar')
+    setConfirmarBorrar(null)
     cancelar(id)
     setSeleccion(s => s.filter(x => x !== id))
     setItems(l => l.filter(i => i.id !== id))
@@ -259,11 +271,18 @@ export default function Cola({ toast }) {
     ids.forEach(cancelar)
     setSeleccion(s => s.filter(x => !ids.includes(x)))
     setItems(l => l.filter(i => !ids.includes(i.id)))
+    setConfirmarLimpiar(false)
     toast(`${viejos.length} ${viejos.length === 1 ? 'partido quitado' : 'partidos quitados'}`)
   }
 
+  /* El tope de cinco existe por el coste del análisis. Antes el sexto toque
+     no hacía nada y no decía por qué. */
   const alternarSeleccion = id =>
-    setSeleccion(s => (s.includes(id) ? s.filter(x => x !== id) : s.length >= 5 ? s : [...s, id]))
+    setSeleccion(s => {
+      if (s.includes(id)) return s.filter(x => x !== id)
+      if (s.length >= 5) { toast('Máximo cinco por tanda'); return s }
+      return [...s, id]
+    })
 
   async function analizarSeleccion() {
     if (!seleccion.length) return toast('Marca los partidos a analizar')
@@ -384,9 +403,21 @@ export default function Cola({ toast }) {
       )}
 
       {jugados.length > 0 && (
-        <button className="ghost" style={{ marginBottom: 14 }} onClick={limpiarJugados}>
-          Quitar {jugados.length} {jugados.length === 1 ? 'partido jugado' : 'partidos jugados'}
-        </button>
+        confirmarLimpiar ? (
+          <div className="flag">
+            <strong>¿Quitar {jugados.length} {jugados.length === 1 ? 'partido' : 'partidos'} ya {jugados.length === 1 ? 'jugado' : 'jugados'}?</strong>{' '}
+            Se van con su análisis. Lo que ya guardaste en Sombra se queda.
+            <div className="row c2" style={{ marginTop: 10 }}>
+              <button className="act" onClick={limpiarJugados}>Sí, quitar</button>
+              <button className="ghost" onClick={() => setConfirmarLimpiar(false)}>Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <button className="ghost" style={{ marginBottom: 14 }}
+                  onClick={() => setConfirmarLimpiar(true)}>
+            Quitar {jugados.length} {jugados.length === 1 ? 'partido jugado' : 'partidos jugados'}
+          </button>
+        )
       )}
 
       {permiso !== 'granted' && permiso !== 'no-soportado' && (
@@ -401,11 +432,14 @@ export default function Cola({ toast }) {
         </div>
       )}
 
-      {!pegando ? (
-        <button className="ghost" style={{ marginBottom: 16 }} onClick={() => setPegando(true)}>
-          ⎘ Pegar cupón de la casa
-        </button>
-      ) : (
+      {!pegando && !anadiendo && (
+        <div className="row c2" style={{ marginBottom: 16 }}>
+          <button className="ghost" onClick={() => setPegando(true)}>⎘ Pegar cupón</button>
+          <button className="ghost" onClick={() => setAnadiendo(true)}>+ Añadir partido</button>
+        </div>
+      )}
+
+      {pegando && (
         <div className="card pegar">
           <div className="field">
             <label htmlFor="cupon-cola">Pega aquí el texto del cupón</label>
@@ -439,6 +473,7 @@ export default function Cola({ toast }) {
         </div>
       )}
 
+      {anadiendo && (
       <div className="card">
         <div className="enfrenta">
           <div className="field">
@@ -485,7 +520,25 @@ export default function Cola({ toast }) {
         </div>
 
         <div className="field">
-          <label>Mercados · {mercados.length}</label>
+          <button className="extras-toggle" onClick={() => setVerMercados(v => !v)}>
+            {verMercados
+              ? '− Cerrar mercados'
+              : `+ Elegir mercados${mercados.length ? ` · ${mercados.length}` : ''}`}
+          </button>
+
+          {/* Con el selector cerrado sigue viéndose lo elegido: plegar no
+              es esconder. */}
+          {!verMercados && mercados.length > 0 && (
+            <div className="chips" style={{ marginTop: 8 }}>
+              {mercados.map(m => (
+                <button key={m} className="chip on" onClick={() => alternarMercado(m)}>
+                  {m} ×
+                </button>
+              ))}
+            </div>
+          )}
+
+          {verMercados && (<>
           <LineaMercado titulo="Goles" unidad="goles"
                         lineasMas={L_GOLES} lineasMenos={L_GOLES}
                         puestos={mercados} onAlternar={alternarMercado} />
@@ -521,10 +574,18 @@ export default function Cola({ toast }) {
               Ningún mercado elegido. Marca solo los que de verdad ibas a apostar.
             </p>
           )}
+          </>)}
         </div>
 
-        <button className="act" onClick={anadir}>+ Añadir a la cola</button>
+        <div className="row c2">
+          <button className="act" onClick={anadir}>+ Añadir a la cola</button>
+          <button className="ghost"
+                  onClick={() => { setAnadiendo(false); setVerMercados(false) }}>
+            Cancelar
+          </button>
+        </div>
       </div>
+      )}
 
       {progreso && (
         <div className="progreso">
@@ -800,9 +861,21 @@ export default function Cola({ toast }) {
                           )}
 
                           <div className="bet-pie">
-                            <button className="tiny" onClick={() => borrar(it.id)}>
-                              Quitar de la cola
-                            </button>
+                            {confirmarBorrar === it.id ? (
+                              <>
+                                <span className="cola-meta">¿Seguro?</span>
+                                <button className="tiny lose on" onClick={() => borrar(it.id)}>
+                                  Sí, quitar
+                                </button>
+                                <button className="tiny" onClick={() => setConfirmarBorrar(null)}>
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <button className="tiny" onClick={() => setConfirmarBorrar(it.id)}>
+                                Quitar de la cola
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
