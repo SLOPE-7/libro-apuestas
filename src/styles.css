@@ -698,3 +698,22 @@ nav button{font-size:10.5px;letter-spacing:.08em}
   font-family:"IBM Plex Mono",monospace;font-size:13px;
   font-variant-numeric:tabular-nums;
 }
+
+/* ── Anuladas ──────────────────────────────────────────────────────────
+   Grupo nuevo del historial. Gris a propósito: una apuesta anulada no es
+   un acierto ni un fallo, y no debe competir visualmente con las que sí
+   movieron dinero.
+   Pegar tal cual al final de src/styles.css.                            */
+
+.grupo-cab.anulada {
+  border-left-color: var(--rule-hard);
+  background: var(--card-2);
+}
+.grupo-cab.anulada .grupo-tit { color: var(--ink-soft); }
+
+.bet.anulada {
+  background: var(--card-2);
+  border-left-color: var(--rule-hard);
+}
+.bet.anulada .bet-amt { color: var(--ink-faint); }
+.bet.anulada .bet-meta { color: var(--ink-faint); }
