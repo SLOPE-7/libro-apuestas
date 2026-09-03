@@ -10,9 +10,26 @@ export function cuotaApuesta(apuesta) {
 }
 
 /**
+ * Patas reales del boleto.
+ * Una selección BetBuilder con varios mercados son varias patas, aunque
+ * viaje en una sola fila. Sin esto un BetBuilder de tres mercados se
+ * contaba como simple y ensuciaba el desglose simples/combinadas.
+ */
+export function patasApuesta(apuesta) {
+  return (apuesta?.selecciones || []).reduce((n, s) => {
+    const subs = Array.isArray(s?.mercados) ? s.mercados : null
+    return n + (subs && subs.length > 1 ? subs.length : 1)
+  }, 0)
+}
+
+/** ¿Es combinada? Cuenta patas, no filas. */
+export const esCombinada = apuesta => patasApuesta(apuesta) > 1
+
+/**
  * Estado del boleto entero.
  *   cerrada   -> se cobró antes de tiempo (cash out)
  *   perdida   -> alguna selección falló
+ *   anulada   -> todas se anularon: no ganaste ni perdiste, no es muestra
  *   ganada    -> todas resueltas y ninguna falló
  *   pendiente -> queda algo por decidir
  */
@@ -21,12 +38,14 @@ export function estadoApuesta(a) {
   return estado(a?.selecciones || [])
 }
 
-/** Una perdida -> perdida. Todas resueltas -> ganada. Resto -> pendiente. */
+/** Una perdida -> perdida. Todas anuladas -> anulada. Todas resueltas -> ganada. */
 export function estado(sel = []) {
   if (!sel.length) return 'pendiente'
   // una sola fallada tumba el boleto, aunque el resto siga en juego
   if (sel.some(s => multiplicador(s) === 0)) return 'perdida'
   if (sel.some(s => estadoSeleccion(s) === 'pendiente')) return 'pendiente'
+  // el boleto entero se cayó por anulación: la casa devuelve y aquí no pasó nada
+  if (sel.every(s => estadoSeleccion(s) === 'anulada')) return 'anulada'
   return 'ganada'
 }
 
@@ -79,7 +98,11 @@ export function resultado(apuesta) {
   if (apuesta.cash_out !== null && apuesta.cash_out !== undefined && apuesta.cash_out !== '')
     return Number(apuesta.cash_out) - stake
 
-  if (estado(sel) === 'pendiente') return 0
+  const e = estado(sel)
+  if (e === 'pendiente') return 0
+  // boleto anulado entero: te devuelven el stake, resultado exactamente cero.
+  // Se corta aquí para que un cuota_total anotado a mano no invente un resultado.
+  if (e === 'anulada') return 0
 
   const producto = sel.reduce((a, s) => a * multiplicador(s), 1)
   if (producto === 0) return -stake
@@ -111,10 +134,26 @@ export function valorCierre(apuesta) {
 
 export const probImplicita = cuota => (cuota > 1 ? 1 / cuota : 0)
 
-/** Probabilidad de que se cumpla la combinada entera. */
+/**
+ * Probabilidad que la casa le está poniendo a la combinada entera.
+ * OJO: lleva el margen dentro, así que está inflada, y en una combinada
+ * el margen se multiplica pata por pata. Es el techo, no la probabilidad real.
+ */
 export const probCombinada = (sel = []) => {
   const t = cuotaTotal(sel)
   return t > 1 ? 1 / t : 0
+}
+
+/**
+ * Margen acumulado aproximado de una combinada.
+ * Si cada pata lleva un margen medio (por defecto 5%), la probabilidad
+ * honesta es la implícita descontando ese margen tantas veces como patas.
+ */
+export function probCombinadaAjustada(sel = [], margenPorPata = 0.05) {
+  const p = probCombinada(sel)
+  if (!p) return 0
+  const n = sel.length || 1
+  return p * Math.pow(1 - margenPorPata, n)
 }
 
 /** Edge absoluto: tu probabilidad menos la implícita. */
@@ -144,10 +183,10 @@ export const REGLAS = {
 export function filtro(miProb, cuota) {
   if (!(cuota > 1) || !(miProb > 0)) return null
   if (cuota < REGLAS.cuotaMin || cuota > REGLAS.cuotaMax)
-    return { ok: false, texto: 'Cuota fuera del rango 1.50–5.00' }
+    return { ok: false, texto: `Cuota fuera del rango ${REGLAS.cuotaMin.toFixed(2)}–${REGLAS.cuotaMax.toFixed(2)}` }
   const e = edge(miProb, cuota)
   if (e < REGLAS.edgeMin)
-    return { ok: false, texto: `Edge insuficiente (${(e * 100).toFixed(1)}%, mínimo 4%)` }
+    return { ok: false, texto: `Edge insuficiente (${(e * 100).toFixed(1)}%, mínimo ${(REGLAS.edgeMin * 100).toFixed(0)}%)` }
   if (e > REGLAS.edgeMax)
     return { ok: false, texto: `Edge del ${(e * 100).toFixed(1)}% — revisa tu análisis, no la cuota` }
   return { ok: true, texto: `Apostable · edge ${(e * 100).toFixed(1)}%` }
@@ -157,10 +196,17 @@ export function filtro(miProb, cuota) {
 export const clv = (tomada, cierre) =>
   tomada > 1 && cierre > 1 ? tomada / cierre - 1 : null
 
+/** Fecha con la que ordenar la curva: la de resolución si existe, si no la de registro. */
+const fechaOrden = a => a.fecha_resuelta || a.fecha || ''
+
 export function resumen(apuestas = [], casas = [], movimientos = []) {
   const conEstado = apuestas.map(a => ({ ...a, _e: estadoApuesta(a), _r: resultado(a) }))
-  const resueltas = conEstado.filter(a => a._e !== 'pendiente')
-  const ganadas = resueltas.filter(a => a._r > 0)
+
+  // Las anuladas no son muestra: no ganaste ni perdiste. Fuera de acierto y de turnover.
+  const anuladas  = conEstado.filter(a => a._e === 'anulada')
+  const resueltas = conEstado.filter(a => a._e !== 'pendiente' && a._e !== 'anulada')
+  const ganadas   = resueltas.filter(a => a._r > 0)
+
   const apostado = resueltas.reduce((s, a) => s + Number(a.stake), 0)
   const neto = conEstado.reduce((s, a) => s + a._r, 0)
   const inicial = casas.reduce((s, c) => s + Number(c.saldo_inicial || 0), 0)
@@ -178,14 +224,49 @@ export function resumen(apuestas = [], casas = [], movimientos = []) {
     .map(s => clv(Number(s.cuota), Number(s.cuota_cierre)))
     .filter(v => v !== null)
 
-  const porTipo = esParlay => {
-    const g = resueltas.filter(a => ((a.selecciones || []).length > 1) === esParlay)
+  // se clasifica por patas reales, no por número de filas
+  const porTipo = combinada => {
+    const g = resueltas.filter(a => esCombinada(a) === combinada)
     return {
       n: g.length,
       neto: g.reduce((s, a) => s + a._r, 0),
-      acierto: g.length ? g.filter(a => a._r > 0).length / g.length : null
+      acierto: g.length ? g.filter(a => a._r > 0).length / g.length : null,
+      apostado: g.reduce((s, a) => s + Number(a.stake), 0)
     }
   }
+
+  /**
+   * Curva de banca. Mete depósitos y retiros en su fecha, para que el último
+   * punto coincida siempre con la banca de arriba. Antes solo acumulaba
+   * resultados y la gráfica se desincronizaba en cuanto movías dinero.
+   */
+  const eventos = [
+    ...conEstado
+      .filter(a => a._e !== 'pendiente')
+      .map(a => ({ fecha: fechaOrden(a), orden: 1, delta: a._r, tipo: 'apuesta' })),
+    ...movimientos.map(m => ({
+      fecha: m.fecha || '',
+      orden: 0,
+      delta: (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0),
+      tipo: m.tipo
+    }))
+  ].sort((a, b) =>
+    a.fecha === b.fecha ? a.orden - b.orden : (a.fecha < b.fecha ? -1 : 1))
+
+  let nApuesta = 0
+  const curva = eventos.reduce((acc, ev, i) => {
+    const prev = i ? acc[i - 1].banca : inicial
+    if (ev.tipo === 'apuesta') nApuesta += 1
+    acc.push({
+      i: i + 1,
+      fecha: ev.fecha,
+      banca: prev + ev.delta,
+      etiqueta: ev.tipo === 'apuesta'
+        ? `Apuesta ${nApuesta}`
+        : ev.tipo === 'deposito' ? 'Depósito' : 'Retiro'
+    })
+    return acc
+  }, [])
 
   return {
     inicial,
@@ -195,12 +276,15 @@ export function resumen(apuestas = [], casas = [], movimientos = []) {
     retirado,
     apostado,
     resueltas: resueltas.length,
-    pendientes: conEstado.length - resueltas.length,
+    anuladas: anuladas.length,
+    pendientes: conEstado.filter(a => a._e === 'pendiente').length,
     acierto: resueltas.length ? ganadas.length / resueltas.length : null,
     yield: apostado ? neto / apostado : null,
     clvMedio: clvs.length ? clvs.reduce((a, b) => a + b, 0) / clvs.length : null,
     clvPositivo: clvs.length ? clvs.filter(v => v > 0).length / clvs.length : null,
     clvN: clvs.length,
+    // margen de error del yield: con pocas apuestas la cifra sola engaña
+    rango: rangoYield(apuestas),
     simples: porTipo(false),
     parlays: porTipo(true),
     porCasa: casas.map(c => {
@@ -209,16 +293,25 @@ export function resumen(apuestas = [], casas = [], movimientos = []) {
         (s, m) => s + (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0), 0)
       return { ...c, neto: n, movimientos: mv, saldo: Number(c.saldo_inicial || 0) + mv + n }
     }),
-    curva: conEstado
-      .filter(a => a._e !== 'pendiente')
-      .slice()
-      .sort((a, b) => (a.fecha < b.fecha ? -1 : 1))
-      .reduce((acc, a, i) => {
-        const prev = i ? acc[i - 1].banca : inicial
-        acc.push({ i: i + 1, fecha: a.fecha, banca: prev + a._r })
-        return acc
-      }, [])
+    curva
   }
+}
+
+/**
+ * Margen de error del rendimiento. Con pocas apuestas el yield es ruido,
+ * y conviene enseñar el rango en vez de la cifra sola.
+ * Aproximación normal sobre el resultado por unidad apostada.
+ */
+export function rangoYield(apuestas = []) {
+  const rs = apuestas
+    .map(a => ({ e: estadoApuesta(a), r: resultado(a), stake: Number(a.stake) || 0 }))
+    .filter(a => a.e !== 'pendiente' && a.e !== 'anulada' && a.stake > 0)
+  if (rs.length < 2) return null
+  const u = rs.map(a => a.r / a.stake)
+  const media = u.reduce((a, b) => a + b, 0) / u.length
+  const varianza = u.reduce((s, v) => s + (v - media) ** 2, 0) / (u.length - 1)
+  const err = Math.sqrt(varianza / u.length)
+  return { media, bajo: media - 1.96 * err, alto: media + 1.96 * err, n: u.length }
 }
 
 /**
