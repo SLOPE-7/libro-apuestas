@@ -176,7 +176,12 @@ export const REGLAS = {
   edgeMax: 0.15,
   cuotaMin: 1.5,
   cuotaMax: 5.0,
-  picksDia: 2
+  picksDia: 2,
+  /* Combinadas. Existen aparte porque el riesgo no es el mismo:
+     el margen se acumula y la varianza se dispara. */
+  patasMax: 4,
+  margenPorPata: 0.05,
+  topeParlay: 0.01
 }
 
 /** Aplica los filtros duros. Devuelve {ok, texto}. */
@@ -190,6 +195,78 @@ export function filtro(miProb, cuota) {
   if (e > REGLAS.edgeMax)
     return { ok: false, texto: `Edge del ${(e * 100).toFixed(1)}% — revisa tu análisis, no la cuota` }
   return { ok: true, texto: `Apostable · edge ${(e * 100).toFixed(1)}%` }
+}
+
+/**
+ * Evalúa una combinada entera antes de guardarla.
+ *
+ * Existe porque el filtro de simples no servía aquí: se apagaba solo en
+ * cuanto había más de una pata, que es justo donde el margen se acumula.
+ *
+ * legs: [{ cuota, mi_prob (0-100), mercados: [...] }]
+ * totalManual: la cuota del cupón, si la anotaste. Manda sobre el producto.
+ *
+ * Sobre el margen: cada cuota que pone la casa ya trae su comisión dentro,
+ * así que 1/cuota exagera la probabilidad real. En una combinada ese error
+ * se multiplica: con margenPorPata al 5% y cinco patas, estás pagando
+ * alrededor de un 23% antes de que ruede el balón.
+ */
+export function evaluarCombinada(legs = [], totalManual = null) {
+  const validas = legs
+    .map((l, _idx) => ({ ...l, _idx }))
+    .filter(l => Number(l.cuota) > 1)
+  const n = validas.length
+  if (!n) return null
+
+  const producto = validas.reduce((a, l) => a * Number(l.cuota), 1)
+  const total = Number(totalManual) > 1 ? Number(totalManual) : producto
+  const probCasa = total > 1 ? 1 / total : 0
+
+  // cuántos mercados hay en total, contando los BetBuilder de un mismo partido
+  const patas = validas.reduce(
+    (a, l) => a + Math.max(1, (l.mercados || []).length), 0)
+
+  const resto = Math.pow(1 - REGLAS.margenPorPata, n)
+  const probHonesta = probCasa * resto
+  const margen = 1 - resto
+
+  // solo se puede juzgar si estimaste TODAS las patas
+  const conProb = validas.filter(l => Number(l.mi_prob) > 0)
+  const completa = conProb.length === n
+  const probMia = completa
+    ? validas.reduce((a, l) => a * (Number(l.mi_prob) / 100), 1)
+    : null
+
+  const edgeTotal = probMia === null ? null : probMia - probCasa
+  const stakeKelly = probMia === null
+    ? 0
+    : kelly(probMia, total, 0.25, REGLAS.topeParlay)
+
+  // patas que no aguantarían solas
+  const flojas = validas
+    .map(l => ({ idx: l._idx, f: filtro(Number(l.mi_prob) / 100, Number(l.cuota)) }))
+    .filter(x => x.f && !x.f.ok)
+
+  const motivos = []
+  if (patas > REGLAS.patasMax)
+    motivos.push(`${patas} mercados, el tope son ${REGLAS.patasMax}`)
+  if (edgeTotal !== null && edgeTotal < REGLAS.edgeMin)
+    motivos.push(`edge del ${(edgeTotal * 100).toFixed(1)}%, mínimo ${(REGLAS.edgeMin * 100).toFixed(0)}%`)
+  if (flojas.length)
+    motivos.push(`${flojas.length} ${flojas.length === 1 ? 'pata no aguanta sola' : 'patas no aguantan solas'}`)
+
+  return {
+    n, patas, total, producto,
+    probCasa, probHonesta, margen,
+    probMia, edgeTotal, completa,
+    kelly: stakeKelly,
+    flojas: flojas.map(x => x.idx),
+    motivos,
+    ok: motivos.length === 0,
+    /* juzgable = hay elementos para decidir. Sin probabilidades estimadas
+       solo se puede opinar del número de patas, no del precio. */
+    juzgable: completa || patas > REGLAS.patasMax
+  }
 }
 
 /** CLV: cuota tomada contra cuota de cierre. */
