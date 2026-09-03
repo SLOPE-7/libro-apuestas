@@ -60,7 +60,28 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     return { total, hechas }
   }
 
-  async function tocarMercado(sel, i) {
+  /**
+   * Escribe la fecha en que la apuesta quedó resuelta.
+   *
+   * La curva de banca se ordenaba por la fecha en que registraste la apuesta,
+   * no por la que se decidió, así que una del día 1 que se resuelve el 5
+   * aparecía antes que una del día 2 ya cerrada. Eso distorsiona el drawdown
+   * y las rachas.
+   *
+   * Se llama después de que el marcado ya se guardó. Si esto fallara, el
+   * marcado sigue bien: solo se vería el orden viejo, así que no se avisa
+   * ni se revierte nada.
+   */
+  async function sincronizarFecha(a, selecciones) {
+    const e = estadoApuesta({ ...a, selecciones })
+    const hoy = new Date().toISOString().slice(0, 10)
+    const actual = a.fecha_resuelta ?? null
+    const debe = e === 'pendiente' ? null : (actual || hoy)
+    if (debe === actual) return
+    await supabase.from('apuestas').update({ fecha_resuelta: debe }).eq('id', a.id)
+  }
+
+  async function tocarMercado(a, sel, i) {
     const previo = (sel.mercados || []).map(m => ({ ...m }))
     const lista = previo.map(m => ({ ...m }))
     const actual = lista[i].e || 'pendiente'
@@ -68,16 +89,20 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     const { error } = await supabase.from('selecciones')
       .update({ mercados: lista }).eq('id', sel.id)
     if (error) return toast('No se pudo actualizar: ' + error.message)
+    await sincronizarFecha(a, (a.selecciones || [])
+      .map(x => (x.id === sel.id ? { ...x, mercados: lista } : x)))
     setDeshacer({ id: sel.id, campo: 'mercados', valor: previo, texto: lista[i].t || 'mercado' })
     onCambio()
   }
 
-  async function marcar(sel, valor) {
+  async function marcar(a, sel, valor) {
     const previo = sel.estado ?? 'pendiente'
     const nuevo = sel.estado === valor ? 'pendiente' : valor
     const { error } = await supabase.from('selecciones')
       .update({ estado: nuevo }).eq('id', sel.id)
     if (error) return toast('No se pudo actualizar: ' + error.message)
+    await sincronizarFecha(a, (a.selecciones || [])
+      .map(x => (x.id === sel.id ? { ...x, estado: nuevo } : x)))
     setDeshacer({ id: sel.id, campo: 'estado', valor: previo, texto: sel.partido || 'selección' })
     onCambio()
   }
@@ -88,6 +113,9 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     const { error } = await supabase.from('selecciones')
       .update({ [deshacer.campo]: deshacer.valor }).eq('id', deshacer.id)
     if (error) return toast('No se pudo deshacer: ' + error.message)
+    const dueña = apuestas.find(a => (a.selecciones || []).some(s => s.id === deshacer.id))
+    if (dueña) await sincronizarFecha(dueña, (dueña.selecciones || [])
+      .map(x => (x.id === deshacer.id ? { ...x, [deshacer.campo]: deshacer.valor } : x)))
     setDeshacer(null)
     toast('Cambio revertido')
     onCambio()
@@ -98,6 +126,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     if (!(v >= 0)) return toast('Escribe cuánto te devolvió la casa')
     const { error } = await supabase.from('apuestas').update({ cash_out: v }).eq('id', a.id)
     if (error) return toast('No se pudo cerrar: ' + error.message)
+    await sincronizarFecha({ ...a, cash_out: v }, a.selecciones || [])
     setCerrando(null); setImporte('')
     toast('Apuesta cerrada'); onCambio()
   }
@@ -105,6 +134,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   async function deshacerCierre(a) {
     const { error } = await supabase.from('apuestas').update({ cash_out: null }).eq('id', a.id)
     if (error) return toast('No se pudo deshacer')
+    await sincronizarFecha({ ...a, cash_out: null }, a.selecciones || [])
     toast('Cierre deshecho'); onCambio()
   }
 
@@ -204,7 +234,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
                           return (
                             <li key={i} className={`sub sub-${m.e || 'pendiente'}`}>
                               <button className={`sub-btn ${cara.cls}`}
-                                      onClick={() => tocarMercado(s, i)}
+                                      onClick={() => tocarMercado(a, s, i)}
                                       aria-label={`${m.t}: ${m.e || 'pendiente'}`}>
                                 {cara.txt}
                               </button>
@@ -227,7 +257,7 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
                         {ESTADOS.map(([v, lbl, cls]) => (
                           <button key={v}
                                   className={`tiny ${cls} ${s.estado === v ? 'on' : ''}`}
-                                  onClick={() => marcar(s, v)}
+                                  onClick={() => marcar(a, s, v)}
                                   aria-label={v.replace('_', ' ')}>{lbl}</button>
                         ))}
                       </div>
