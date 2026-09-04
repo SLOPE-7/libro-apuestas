@@ -911,3 +911,112 @@ button.act.act-riesgo:hover { filter: brightness(1.08); }
   font-style: normal; font-size: 11px; opacity: .5;
   margin-left: 8px; font-variant-numeric: tabular-nums;
 }
+/* ── Anuladas ──────────────────────────────────────────────────────────
+   Grupo nuevo del historial. Gris a propósito: una apuesta anulada no es
+   un acierto ni un fallo, y no debe competir visualmente con las que sí
+   movieron dinero.
+   Pegar tal cual al final de src/styles.css.                            */
+
+.grupo-cab.anulada {
+  border-left-color: var(--rule-hard);
+  background: var(--card-2);
+}
+.grupo-cab.anulada .grupo-tit { color: var(--ink-soft); }
+
+.bet.anulada {
+  background: var(--card-2);
+  border-left-color: var(--rule-hard);
+}
+.bet.anulada .bet-amt { color: var(--ink-faint); }
+.bet.anulada .bet-meta { color: var(--ink-faint); }
+
+/* ── Reglas en el registro ─────────────────────────────────────────────
+   Una pata marcada es la que no aguantaría sola. El botón cambia de
+   color cuando la apuesta no pasa: sigue siendo pulsable, pero deja de
+   parecer la acción normal.                                            */
+
+.leg.leg-floja {
+  border-left: 3px solid var(--loss);
+  padding-left: 11px;
+  background: var(--loss-fondo);
+}
+
+button.act.act-riesgo {
+  background: var(--loss);
+  border-color: var(--loss);
+}
+button.act.act-riesgo:hover { filter: brightness(1.08); }
+
+/* ── Jerarquía en las cifras de Resumen ────────────────────────────────
+   Banca y resultado neto mandan; las otras cuatro acompañan. Las dos
+   rejillas se pegan como un solo bloque: la de arriba pierde el margen
+   inferior y la de abajo el radio superior.                            */
+
+.figs.figs-alta { margin-bottom: 1px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.figs.figs-alta .fig { padding: 17px 15px; }
+.figs.figs-alta .fig .v { font-size: 30px; }
+
+.figs.figs-baja { border-top-left-radius: 0; border-top-right-radius: 0; }
+.figs.figs-baja .fig { padding: 11px 15px; }
+.figs.figs-baja .fig .v { font-size: 17px; }
+
+@media (max-width: 420px) {
+  .figs.figs-alta .fig .v { font-size: 25px; }
+  /* En pantalla estrecha .figs pasa a una columna y cuatro filas serían
+     demasiado alto: las secundarias se quedan en dos. */
+  .figs.figs-baja { grid-template-columns: 1fr 1fr; }
+  .figs.figs-baja .fig .v { font-size: 15px; }
+}
+
+
+/* ── FRANJA DE PRÓXIMOS ───────────────────────────────────────────────
+   Sin importes a propósito. Es la pantalla que se mira con el partido
+   en curso y no debe invitar a tocar nada por nervios. */
+.proximos { margin: 18px 0 22px; }
+.prox-dia { margin-bottom: 14px; }
+.prox-cab {
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  opacity: .55; margin: 10px 0 6px;
+}
+.prox-hora {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 10px 12px; border-radius: 10px;
+  background: rgba(255,255,255,.035);
+  border-left: 3px solid rgba(255,255,255,.14);
+  margin-bottom: 6px;
+}
+.prox-hora.vivo { border-left-color: #d98324; background: rgba(217,131,36,.09); }
+.prox-reloj { min-width: 62px; display: flex; flex-direction: column; gap: 2px; }
+.prox-reloj b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.prox-reloj em { font-style: normal; font-size: 11px; opacity: .6; }
+.prox-hora.vivo .prox-reloj em { color: #d98324; opacity: 1; }
+.prox-lista { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.prox-item {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  background: none; border: 0; padding: 2px 0; text-align: left;
+  color: inherit; font: inherit; cursor: pointer;
+}
+.prox-item:active { opacity: .6; }
+.prox-part { font-size: 14px; line-height: 1.25; }
+.prox-merc {
+  font-size: 11.5px; opacity: .55; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* hora leída del cupón, junto al número de partido en el registro */
+.leg-hora {
+  font-style: normal; font-size: 11px; opacity: .5;
+  margin-left: 8px; font-variant-numeric: tabular-nums;
+}
+
+
+/* fechas plegadas de Próximos: hoy y mañana se ven, el resto se elige */
+.prox-fechas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.prox-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+  color: inherit; font: inherit; font-size: 12px; text-transform: capitalize;
+}
+.prox-chip em { font-style: normal; font-size: 11px; opacity: .5; }
+.prox-chip.on { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.3); }
