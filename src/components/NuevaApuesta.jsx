@@ -27,8 +27,16 @@ const BASE = {
 const mercadoVacio = () => ({ tipo: '1x2', seleccion: '' })
 const legVacia = () => ({
   local: '', visitante: '', mercados: [mercadoVacio()],
-  cuota: '', mi_prob: '', cuota_cierre: ''
+  cuota: '', mi_prob: '', cuota_cierre: '',
+  fecha_partido: null, hora: null
 })
+
+/** "04/09 · 11:00" a partir de lo que leyó el cupón. */
+function inicioLegible(l) {
+  if (!l.fecha_partido || !l.hora) return null
+  const [, m, d] = String(l.fecha_partido).split('-')
+  return `${d}/${m} · ${String(l.hora).slice(0, 5)}`
+}
 
 let ultimaCasa = null
 
@@ -112,7 +120,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
       mercados: l.mercados.map(m => ({ tipo: m.tipo || 'Otro', seleccion: m.seleccion || '' })),
       cuota: l.cuota != null ? String(l.cuota) : '',
       mi_prob: '',
-      cuota_cierre: ''
+      cuota_cierre: '',
+      fecha_partido: l.fecha_partido || null,
+      hora: l.hora || null
     })))
     if (r.stake != null) setStake(String(r.stake))
     if (r.total != null) setCuotaCasa(String(r.total))
@@ -120,11 +130,13 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
     setPegando(false)
     setCupon('')
 
+    const sinHora = r.legs.filter(l => !l.fecha_partido || !l.hora).length
     const sinCuotaLeidas = r.legs.filter(l => l.cuota == null).length
     const deducidas = r.legs.filter(l => l.deducida).length
     let msg = `${r.legs.length} ${r.legs.length === 1 ? 'selección leída' : 'selecciones leídas'}`
     if (sinCuotaLeidas) msg += ` · ${sinCuotaLeidas} sin cuota`
     if (deducidas) msg += ` · ${deducidas} cuota deducida del total`
+    if (sinHora) msg += ` · ${sinHora} sin hora de partido`
     toast(msg + ' — revísalas')
   }
 
@@ -203,7 +215,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
           : null,
         cuota: Number(l.cuota),
         mi_prob: Number(l.mi_prob) > 0 ? Number(l.mi_prob) / 100 : null,
-        cuota_cierre: Number(l.cuota_cierre) > 1 ? Number(l.cuota_cierre) : null
+        cuota_cierre: Number(l.cuota_cierre) > 1 ? Number(l.cuota_cierre) : null,
+        fecha_partido: l.fecha_partido || null,
+        hora: l.hora || null
       }))
     )
     setGuardando(false)
@@ -289,7 +303,10 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
             <div className={`leg ${floja ? 'leg-floja' : ''}`} key={i}>
               {tipo === 'combinada' && (
                 <div className="leg-head">
-                  <span className="leg-n">Partido {i + 1}</span>
+                  <span className="leg-n">
+                    Partido {i + 1}
+                    {inicioLegible(l) && <em className="leg-hora">{inicioLegible(l)}</em>}
+                  </span>
                   {legs.length > 1 &&
                     <button className="x" onClick={() => delLeg(i)}
                             aria-label={`Quitar partido ${i + 1}`}>×</button>}
