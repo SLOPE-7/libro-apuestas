@@ -6,6 +6,15 @@ import { normalizar } from '../lib/mercados'
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 const signo = v => (v < 0 ? 'neg' : v > 0 ? 'pos' : '')
 
+/** De dónde salió cada estimación: la pediste tú, la eligió ella sola, o es
+ *  una corrección a algo tuyo que no se sostenía. */
+function origenDe(r) {
+  const v = String(r.veredicto || '')
+  if (v.startsWith('pick propio')) return 'Los eligió ella'
+  if (v.startsWith('alternativa'))  return 'Correcciones suyas'
+  return 'Los pediste tú'
+}
+
 /** Agrupa por una clave y calcula acierto y yield de cada grupo. */
 function agrupar(lista, clave) {
   return Object.values(
@@ -149,6 +158,10 @@ export default function Sombra({ toast }) {
   const porMercado    = agrupar(conCuota, r => normalizar(r.mercado_ia))
   const porFamilia    = agrupar(conCuota, r => familiaDe(r.mercado_ia))
   const porLiga       = agrupar(conCuota, r => r.competicion)
+  /* La comparación que importa: quién elige mejor. Por yield y no por acierto,
+     porque quien elige lo más seguro gana siempre en acierto y pierde dinero. */
+  const porOrigen = agrupar(conCuota, origenDe)
+
   const porConfianza  = agrupar(conCuota, r => {
     const c = Number(r.confianza)
     if (!c) return 'sin confianza'
@@ -261,6 +274,15 @@ export default function Sombra({ toast }) {
           {panelBtn('familia', 'Por tipo de mercado', porFamilia, 5)}
           {panelBtn('mercado', 'Por mercado exacto', porMercado, 5)}
           {panelBtn('liga', 'Por competición', porLiga, 5)}
+          {panelBtn('origen', '¿Quién elige mejor?', porOrigen, 3)}
+          {panel === 'origen' && (
+            <p className="ayuda">
+              Mira el yield, no el acierto. Quien elige lo más seguro gana siempre en
+              acierto y pierde dinero igual. Y no decidas nada hasta tener unas cuantas
+              decenas de cada grupo: con diez estimaciones esto no distingue destreza
+              de suerte.
+            </p>
+          )}
           {panelBtn('confianza', 'Por confianza declarada', porConfianza, 5)}
 
           <div className="flag" style={{ marginTop: 10 }}>
