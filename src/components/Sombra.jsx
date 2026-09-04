@@ -52,6 +52,9 @@ function Tabla({ filas, etiqueta, minimo }) {
 export default function Sombra({ toast }) {
   const [registros, setRegistros] = useState([])
   const [abierto, setAbierto] = useState(null)
+  /* Los análisis ya marcados por completo se guardan detrás de una cabecera.
+     Se acumulan rápido y empujan hacia abajo lo que aún tienes que marcar. */
+  const [verArchivo, setVerArchivo] = useState(false)
   const [filtro, setFiltro] = useState('todos')
   const [panel, setPanel] = useState(null)
 
@@ -105,10 +108,19 @@ export default function Sombra({ toast }) {
     return true
   })
 
+  /* Un grupo está cerrado cuando todos sus mercados tienen veredicto. */
+  const estaCompleto = g => g.items.every(i => i.acerto_ia != null)
+  const abiertos = grupos.filter(g => !estaCompleto(g))
+  const cerrados = grupos.filter(estaCompleto)
+
   const resueltas = registros.filter(r => r.acerto_ia != null)
   const aciertos = resueltas.filter(r => r.acerto_ia).length
-  const probMedia = resueltas.length
-    ? resueltas.reduce((a, r) => a + Number(r.prob_ia || 0), 0) / resueltas.length : null
+  /* Las alternativas que propuso el modelo se guardan sin probabilidad. Cuentan
+     para acierto y para yield, pero no para la calibración: promediar un null
+     como cero hundiría el "decía acertar". */
+  const conProb = resueltas.filter(r => r.prob_ia != null)
+  const probMedia = conProb.length
+    ? conProb.reduce((a, r) => a + Number(r.prob_ia), 0) / conProb.length : null
   const tasaReal = resueltas.length ? aciertos / resueltas.length : null
 
   const conCuota = resueltas.filter(r => Number(r.cuota_ia) > 1)
@@ -274,12 +286,34 @@ export default function Sombra({ toast }) {
       </div>
 
       <div className="sec-label" style={{ marginTop: 16 }}>
-        <span className="eyebrow">Archivo</span>
-        <span className="contador">{grupos.length}</span>
+        <span className="eyebrow">Por marcar</span>
+        <span className="contador">{abiertos.length}</span>
       </div>
 
-      {grupos.map(g => {
-        const hechas = g.items.filter(i => i.acerto_ia != null).length
+      {abiertos.length === 0 && (
+        <div className="empty">Nada pendiente de marcar.</div>
+      )}
+
+      {abiertos.map(tarjeta)}
+
+      {cerrados.length > 0 && (
+        <>
+          <button className="grupo-cab ganada" style={{ marginTop: 16 }}
+                  onClick={() => setVerArchivo(v => !v)} aria-expanded={verArchivo}>
+            <span className="grupo-tit">Archivo</span>
+            <span className="grupo-datos">
+              <span className="contador">{cerrados.length}</span>
+              <span className="chevron">{verArchivo ? '−' : '+'}</span>
+            </span>
+          </button>
+          {verArchivo && cerrados.map(tarjeta)}
+        </>
+      )}
+    </section>
+  )
+
+  function tarjeta(g) {
+    const hechas = g.items.filter(i => i.acerto_ia != null).length
         const ok = g.items.filter(i => i.acerto_ia === true).length
         const faltanCuotas = g.items.filter(i => i.acerto_ia != null && !(Number(i.cuota_ia) > 1)).length
         const completo = hechas === g.items.length
@@ -314,8 +348,13 @@ export default function Sombra({ toast }) {
                 {g.items.map(r => (
                   <div className="sel" key={r.id}>
                     <div className="sel-row">
-                      <div className="sel-txt">{normalizar(r.mercado_ia)}</div>
-                      <span className="odd">{pct(Number(r.prob_ia))}</span>
+                      <div className="sel-txt">
+                        {normalizar(r.mercado_ia)}
+                        {r.veredicto?.startsWith('alternativa') && (
+                          <em>{r.veredicto} — no la pediste tú, la propuso el modelo</em>
+                        )}
+                      </div>
+                      <span className="odd">{r.prob_ia == null ? '—' : pct(Number(r.prob_ia))}</span>
                     </div>
                     <div className="row c2" style={{ marginTop: 8, marginBottom: 8 }}>
                       <CampoLento id={`cu-${r.id}`} etiqueta="Cuota de la casa"
@@ -339,8 +378,6 @@ export default function Sombra({ toast }) {
               </div>
             )}
           </article>
-        )
-      })}
-    </section>
-  )
+    )
+  }
 }
