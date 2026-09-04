@@ -53,7 +53,9 @@ export default function NuevaApuesta({ casas, banca, onGuardado, toast }) {
      La regla no prohíbe: obliga a decidirlo a conciencia. */
   const [forzar, setForzar]       = useState(false)
 
-  const [pegando, setPegando] = useState(false)
+  /* Abierta de entrada: el registro entra siempre por cupón. El formulario
+     de abajo sigue estando porque es donde se revisan las patas leídas. */
+  const [pegando, setPegando] = useState(true)
   const [cupon, setCupon]     = useState('')
 
   const [histEquipos, setHistEquipos] = useState([])
