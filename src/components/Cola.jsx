@@ -56,6 +56,7 @@ export default function Cola({ toast }) {
   const [verMercados, setVerMercados] = useState(false)
   const [confirmarBorrar, setConfirmarBorrar] = useState(null)
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false)
+  const [confirmarLimpiarPie, setConfirmarLimpiarPie] = useState(false)
   const [cupon, setCupon] = useState('')
   const [ligaCupon, setLigaCupon] = useState('')
   const [paisCupon, setPaisCupon] = useState('')
@@ -960,6 +961,27 @@ export default function Cola({ toast }) {
               </div>
             )
           })}
+
+          {/* Repetido aquí a propósito: el de arriba no se ve cuando has bajado
+              hasta el final del listado, que es justo cuando quieres limpiar. */}
+          {jugados.length > 0 && (
+            <button className="ghost" style={{ marginTop: 14 }}
+                    onClick={() => setConfirmarLimpiarPie(v => !v)}>
+              Quitar {jugados.length} {jugados.length === 1 ? 'partido jugado' : 'partidos jugados'}
+            </button>
+          )}
+          {confirmarLimpiarPie && (
+            <div className="flag">
+              <strong>¿Quitar {jugados.length} de la cola?</strong>{' '}
+              Se van con su análisis. Lo que ya guardaste en Sombra se queda.
+              <div className="row c2" style={{ marginTop: 10 }}>
+                <button className="act" onClick={() => { limpiarJugados(); setConfirmarLimpiarPie(false) }}>
+                  Sí, quitar
+                </button>
+                <button className="ghost" onClick={() => setConfirmarLimpiarPie(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
 
           <button className="act" style={{ marginTop: 14 }}
                   onClick={analizarSeleccion} disabled={corriendo || !seleccion.length}>
