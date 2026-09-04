@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   cuotaApuesta, cuotaTotal, estadoApuesta, estadoSeleccion,
@@ -21,7 +21,7 @@ const ESTADOS = [
   ['anulada', '∅', 'void']
 ]
 
-export default function Historial({ apuestas, casas, onCambio, toast }) {
+export default function Historial({ apuestas, casas, onCambio, toast, destacada, onVista }) {
   const [abierta, setAbierta] = useState(null)
   const [cerrando, setCerrando] = useState(null)
   const [importe, setImporte] = useState('')
@@ -31,6 +31,20 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
   const [verGanadas, setVerGanadas] = useState(true)
   /* Confirmación de borrado: guarda el id de la apuesta que está esperando el sí. */
   const [confirmando, setConfirmando] = useState(null)
+
+  /* Al entrar desde la franja de Próximos no basta con cambiar de pestaña:
+     con decenas de asientos habría que buscar el boleto a mano. Se abre y se
+     baja hasta él. */
+  useEffect(() => {
+    if (!destacada) return
+    setAbierta(destacada)
+    const t = setTimeout(() => {
+      document.getElementById(`ap-${destacada}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      onVista?.()
+    }, 60)
+    return () => clearTimeout(t)
+  }, [destacada, onVista])
   /* Último cambio de marcado, para poder revertirlo de un toque. */
   const [deshacer, setDeshacer] = useState(null)
 
@@ -181,7 +195,8 @@ export default function Historial({ apuestas, casas, onCambio, toast }) {
     const patas = patasApuesta(a)
 
     return (
-      <article className={`bet compacta ${e} ${abierto ? 'abierta' : ''}`} key={a.id}>
+      <article className={`bet compacta ${e} ${abierto ? 'abierta' : ''}`} key={a.id}
+               id={`ap-${a.id}`}>
         <button className="bet-cabecera" onClick={() => setAbierta(abierto ? null : a.id)}
                 aria-expanded={abierto}>
           <div className="bet-izq">
