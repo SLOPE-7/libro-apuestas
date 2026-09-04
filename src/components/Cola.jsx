@@ -362,6 +362,17 @@ export default function Cola({ toast }) {
     /* Las alternativas se guardan como registros propios. Sin esto no había
        forma de saber si las correcciones del modelo eran mejores que lo que
        tú ibas a apostar, que es justo lo que interesa medir. */
+    /* Los mercados que eligió la IA por su cuenta. Se guardan aparte para
+       poder comparar por yield quién elige mejor: tú o ella. */
+    const picks = (it.respuesta.picks_ia || [])
+      .filter(g => g.mercado)
+      .map(g => ({
+        ...comun,
+        mercado_ia: g.mercado,
+        prob_ia: g.probabilidad ?? null,
+        veredicto: 'pick propio de la IA'
+      }))
+
     const alternativas = (it.respuesta.sugerencias || [])
       .filter(g => g.considera)
       .map(g => ({
@@ -373,6 +384,7 @@ export default function Cola({ toast }) {
 
     const filas = [
       ...lista.map(m => ({ ...comun, mercado_ia: m.mercado, prob_ia: m.probabilidad })),
+      ...picks,
       ...alternativas
     ]
 
@@ -380,6 +392,7 @@ export default function Cola({ toast }) {
     if (error) return toast('No se pudo guardar: ' + error.message)
     toast(
       `${lista.length} guardadas` +
+      (picks.length ? ` + ${picks.length} suyas` : '') +
       (alternativas.length ? ` + ${alternativas.length} alternativas` : '') +
       ' · anota las cuotas en Sombra'
     )
@@ -701,6 +714,22 @@ export default function Cola({ toast }) {
                                         </li>
                                       ) : null)}
                                   </ul>
+                                </div>
+                              )}
+                              {!!it.respuesta.picks_ia?.length && (
+                                <div className="sel">
+                                  <span className="eyebrow">Lo que ella habría elegido</span>
+                                  {it.respuesta.picks_ia.map((g, k) => (
+                                    <div className="sel-row" key={k}>
+                                      <div className="sel-txt">
+                                        <b>{g.mercado}</b>
+                                        {g.porque && <em>{g.porque}</em>}
+                                      </div>
+                                      <span className="odd">
+                                        {g.probabilidad == null ? '—' : pct(g.probabilidad)}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                               {it.respuesta.datos && (
