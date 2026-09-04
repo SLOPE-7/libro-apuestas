@@ -1,11 +1,24 @@
+import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from 'recharts'
 import { diagnostico } from '../lib/calc'
+import { proximos, cuandoEmpieza } from '../lib/proximos'
 
 const money = v => (v < 0 ? '-' : '') + 'L' + Math.abs(v).toFixed(2)
 const pct = v => (v === null || v === undefined ? '—' : (v * 100).toFixed(1) + '%')
 const signo = v => (v < 0 ? 'neg' : v > 0 ? 'pos' : '')
 
-export default function Resumen({ r }) {
+export default function Resumen({ r, apuestas = [], onAbrir }) {
+  /* La franja se recalcula sola cada minuto para que "en 30 min" no se
+     quede congelado si dejas la app abierta. */
+  const [ahora, setAhora] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 60000)
+    const alVolver = () => { if (!document.hidden) setAhora(Date.now()) }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
+  }, [])
+  const dias = proximos(apuestas, ahora)
+
   /* Dos cifras mandan y cuatro acompañan. Antes las seis pesaban igual y
      el rendimiento competía en tamaño con la banca, que es lo que de verdad
      tienes. El color del rendimiento se guarda hasta que haya muestra: con
@@ -28,6 +41,44 @@ export default function Resumen({ r }) {
 
   return (
     <section>
+      {dias.length > 0 && (
+        <div className="proximos">
+          <div className="sec-label">
+            <span className="eyebrow">🗓️ Próximos</span>
+            <span className="contador">
+              {dias.reduce((a, d) => a + d.horas.reduce((b, h) => b + h.items.length, 0), 0)}
+            </span>
+          </div>
+          {dias.map(d => (
+            <div className="prox-dia" key={d.dia}>
+              <div className="prox-cab">{d.etiqueta}</div>
+              {d.horas.map(h => (
+                <div className={`prox-hora ${h.enJuego ? 'vivo' : ''}`} key={h.hora}>
+                  <div className="prox-reloj">
+                    <b>{h.hora}</b>
+                    <em>{cuandoEmpieza(h.items[0].inicio, ahora)}</em>
+                  </div>
+                  <div className="prox-lista">
+                    {h.items.map(it => (
+                      <button className="prox-item" key={it.selId}
+                              onClick={() => onAbrir?.(it.apuestaId)}>
+                        <span className="prox-part">{it.partido}</span>
+                        {it.mercado && <span className="prox-merc">{it.mercado}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          <p className="ayuda">
+            Solo los partidos aún sin resolver de boletos abiertos. Toca uno para abrir
+            su apuesta. Aquí no van importes a propósito: es la pantalla que miras con
+            el partido en curso.
+          </p>
+        </div>
+      )}
+
       <div className="figs figs-alta">
         {principales.map(([k, v, c]) => (
           <div className="fig" key={k}>
