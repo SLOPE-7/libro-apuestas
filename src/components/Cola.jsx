@@ -343,18 +343,46 @@ export default function Cola({ toast }) {
   async function guardarEnSombra(it) {
     const lista = it.respuesta?.mercados || []
     if (!lista.length) return toast('Nada que guardar')
-    const { error } = await supabase.from('sombra').insert(
-      lista.map(m => ({
-        partido: `${it.local} vs ${it.visitante}`,
-        competicion: it.competicion || null,
-        mercado_ia: m.mercado,
-        prob_ia: m.probabilidad,
-        confianza: it.respuesta.confianza ?? null,
-        razonamiento: [it.respuesta.datos, it.respuesta.aviso].filter(Boolean).join('\n\n').slice(0, 4000)
+
+    const base = it.respuesta.linea_base
+    const razonamiento = [
+      base && ['Línea base:', base.goles, base.corners, base.tarjetas]
+        .filter(Boolean).join(' · '),
+      it.respuesta.datos,
+      it.respuesta.aviso
+    ].filter(Boolean).join('\n\n').slice(0, 4000)
+
+    const comun = {
+      partido: `${it.local} vs ${it.visitante}`,
+      competicion: it.competicion || null,
+      confianza: it.respuesta.confianza ?? null,
+      razonamiento
+    }
+
+    /* Las alternativas se guardan como registros propios. Sin esto no había
+       forma de saber si las correcciones del modelo eran mejores que lo que
+       tú ibas a apostar, que es justo lo que interesa medir. */
+    const alternativas = (it.respuesta.sugerencias || [])
+      .filter(g => g.considera)
+      .map(g => ({
+        ...comun,
+        mercado_ia: g.considera,
+        prob_ia: null,
+        veredicto: `alternativa a: ${g.en_lugar_de || '—'}`
       }))
-    )
+
+    const filas = [
+      ...lista.map(m => ({ ...comun, mercado_ia: m.mercado, prob_ia: m.probabilidad })),
+      ...alternativas
+    ]
+
+    const { error } = await supabase.from('sombra').insert(filas)
     if (error) return toast('No se pudo guardar: ' + error.message)
-    toast(`${lista.length} guardadas · anota las cuotas en Sombra`)
+    toast(
+      `${lista.length} guardadas` +
+      (alternativas.length ? ` + ${alternativas.length} alternativas` : '') +
+      ' · anota las cuotas en Sombra'
+    )
   }
 
   const campo = (it, k, etiqueta, extra = {}) => (
@@ -659,6 +687,22 @@ export default function Cola({ toast }) {
 
                           {it.respuesta?.mercados?.length > 0 && (
                             <>
+                              {/* Lo que el modelo esperaba del partido antes de
+                                  mirar tus mercados. Si tu línea está lejos de
+                                  esto, ahí está la respuesta. */}
+                              {it.respuesta.linea_base && (
+                                <div className="sel">
+                                  <span className="eyebrow">Lo que espera del partido</span>
+                                  <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
+                                    {['goles', 'corners', 'tarjetas'].map(k =>
+                                      it.respuesta.linea_base[k] ? (
+                                        <li key={k} style={{ marginBottom: 4 }}>
+                                          {it.respuesta.linea_base[k]}
+                                        </li>
+                                      ) : null)}
+                                  </ul>
+                                </div>
+                              )}
                               {it.respuesta.datos && (
                                 <p className="razonamiento">{it.respuesta.datos}</p>
                               )}
@@ -669,7 +713,9 @@ export default function Cola({ toast }) {
                                       <b>{m.mercado}</b>
                                       {m.razon && <em>{m.razon}</em>}
                                     </div>
-                                    <span className="odd">{pct(m.probabilidad)}</span>
+                                    <span className={`odd ${m.probabilidad < 0.5 ? 'neg' : ''}`}>
+                                      {pct(m.probabilidad)}
+                                    </span>
                                   </div>
                                 </div>
                               ))}
