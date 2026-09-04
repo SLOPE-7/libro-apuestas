@@ -28,6 +28,7 @@ export default function App() {
   const [apuestas, setApuestas] = useState([])
   const [tab, setTab] = useState('resumen')
   const [vistaModelo, setVistaModelo] = useState('cola')
+  const [destacada, setDestacada] = useState(null)   // boleto a abrir en Historial
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
 
@@ -82,7 +83,7 @@ export default function App() {
       <nav role="tablist">
         {TABS.map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id}
-                  onClick={() => { setTab(id); window.scrollTo(0, 0) }}>
+                  onClick={() => { setDestacada(null); setTab(id); window.scrollTo(0, 0) }}>
             {label}
           </button>
         ))}
@@ -91,13 +92,17 @@ export default function App() {
       {cargando && !apuestas.length
         ? <div className="empty">Cargando el libro…</div>
         : <>
-            {tab === 'resumen' && <Resumen r={r} />}
+            {tab === 'resumen' && (
+              <Resumen r={r} apuestas={apuestas}
+                       onAbrir={id => { setDestacada(id); setTab('historial') }} />
+            )}
             {tab === 'nueva' && (
               <NuevaApuesta casas={casas} banca={r.banca} toast={toast}
                             onGuardado={() => { cargar(); setTab('historial') }} />
             )}
             {tab === 'historial' && (
-              <Historial apuestas={apuestas} casas={casas} onCambio={cargar} toast={toast} />
+              <Historial apuestas={apuestas} casas={casas} onCambio={cargar} toast={toast}
+                         destacada={destacada} onVista={() => setDestacada(null)} />
             )}
 
             {tab === 'modelo' && (
