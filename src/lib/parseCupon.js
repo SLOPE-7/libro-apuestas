@@ -9,23 +9,73 @@
  * más vale un hueco visible que un número inventado.
  */
 
+/**
+ * Convierte a número aguantando los dos convenios. Con punto Y coma a la vez
+ * (16,692.94) el decimal es el separador que aparece último y el otro son
+ * miles: sin esto, parseFloat corta en la coma y devuelve 16.
+ */
 const num = t => {
   if (t === null || t === undefined) return null
-  const s = String(t).trim().replace(/\s/g, '')
+  let s = String(t).trim().replace(/\s/g, '')
   if (!s) return null
-  const v = parseFloat(s.includes(',') && !s.includes('.') ? s.replace(',', '.') : s)
+  const hayPunto = s.includes('.'), hayComa = s.includes(',')
+  if (hayPunto && hayComa) {
+    const dec = s.lastIndexOf('.') > s.lastIndexOf(',') ? '.' : ','
+    s = s.split(dec === '.' ? ',' : '.').join('')
+    if (dec === ',') s = s.replace(',', '.')
+  } else if (hayComa) {
+    // una sola coma se ha usado siempre como decimal; varias son miles
+    s = (s.match(/,/g).length > 1) ? s.split(',').join('') : s.replace(',', '.')
+  }
+  const v = parseFloat(s)
   return Number.isFinite(v) ? v : null
 }
 const redondea = v => (v == null ? null : Math.round(v * 100) / 100)
 
 const ES_PARTIDO   = /\s+vs\.?\s+/i
-const SOLO_NUMERO  = /^[\d]+[.,]?\d*$|^[.,]\d+$/
-const FECHA        = /\d{1,2}\/\d{1,2}\s*[•·]?\s*\d{1,2}:\d{2}/
+const SOLO_NUMERO  = /^[\d]+(?:[.,]\d+)*$|^[.,]\d+$/
+const FECHA        = /(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*[•·|-]?\s*(\d{1,2}):(\d{2})/
 const PREFIJO_LIGA = /^.*?\d{1,2}\/\d{1,2}\s*[•·]?\s*\d{1,2}:\d{2}\s*/
 const RUIDO        = /^(cliente|id de la apuesta|nombre de afiliado|ib|tipo de apuesta|coupon|múltiple|multiple|copia|barcode|fecha|ganancia\s+total|total\s+a\s+ganar)\b/i
 const NUMERO_LARGO = /^\(?\d{6,}\)?$/
 // mercado cortado: "…Más de", "…Menos de", "…total:"
 const COLGANDO     = /(más de|menos de|over|under|total|handicap|hándicap|:)\s*$/i
+
+const pad = v => String(v).padStart(2, '0')
+
+/**
+ * El cupón trae "04/09 • 11:00" sin año. Se asume el año en curso, salvo que
+ * eso deje el partido absurdamente lejos: un cupón se pega cerca del partido,
+ * así que una fecha muy atrasada es de enero del año que viene y una muy
+ * adelantada es de diciembre del pasado.
+ */
+function fechaConAno(d, m, y, hoy = new Date()) {
+  const dd = Number(d), mm = Number(m)
+  if (!(dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12)) return null
+  let ano
+  if (y) {
+    ano = Number(y)
+    if (ano < 100) ano += 2000
+  } else {
+    ano = hoy.getFullYear()
+    const dias = (new Date(ano, mm - 1, dd) - hoy) / 86400000
+    if (dias < -180) ano += 1
+    else if (dias > 300) ano -= 1
+  }
+  return `${ano}-${pad(mm)}-${pad(dd)}`
+}
+
+/** Saca fecha y hora de una línea, o null si no las tiene. */
+function inicioDe(linea) {
+  const f = String(linea).match(FECHA)
+  if (!f) return null
+  const [, d, m, y, hh, mi] = f
+  const fecha = fechaConAno(d, m, y)
+  if (!fecha) return null
+  const h = Number(hh)
+  if (h > 23 || Number(mi) > 59) return null
+  return { fecha_partido: fecha, hora: `${pad(h)}:${mi}` }
+}
 
 function partirMercado(texto) {
   const t = texto.replace(/^BetBuilder\s*:\s*/i, '')
@@ -66,6 +116,7 @@ export function parseCupon(texto = '') {
   const legs = []
   const cuotasSueltas = []
   let actual = null, stakePie = null, totalPie = null
+  let pendiente = null            // día y hora leídos de la cabecera anterior
   const cerrar = () => {
     if (actual) {
       if (actual._buf.length && !actual.mercados.length)
@@ -76,11 +127,11 @@ export function parseCupon(texto = '') {
 
   for (const linea of lineas) {
     if (/^VALOR\s+APOSTADO/i.test(linea)) {
-      const m = linea.match(/([\d]+[.,]\d+|\d+)\s*$/); if (m) stakePie = num(m[1])
+      const m = linea.match(/([\d]+(?:[.,]\d+)*)\s*$/); if (m) stakePie = num(m[1])
       cerrar(); continue
     }
     if (/^CUOTAS\s*:/.test(linea)) {              // mayúsculas: total del boleto
-      const m = linea.match(/([\d]+[.,]\d+|\d+)\s*$/); if (m) totalPie = num(m[1])
+      const m = linea.match(/([\d]+(?:[.,]\d+)*)\s*$/); if (m) totalPie = num(m[1])
       cerrar(); continue
     }
     const soloCuota = linea.match(/^Cuotas?\s*:\s*([\d.,]*)$/i)
@@ -104,21 +155,27 @@ export function parseCupon(texto = '') {
         const [loc, vis] = tabla[1].replace(PREFIJO_LIGA, '').split(ES_PARTIDO)
         legs.push({
           local: (loc || '').trim(), visitante: (vis || '').trim(),
-          mercados: partirMercados(tabla[2]), cuota: num(tabla[3]), _buf: []
+          mercados: partirMercados(tabla[2]), cuota: num(tabla[3]), _buf: [],
+          ...(inicioDe(tabla[1]) || pendiente || {})
         })
+        pendiente = null
         continue
       }
       const [loc, vis] = linea.replace(PREFIJO_LIGA, '').split(ES_PARTIDO)
       actual = {
         local: (loc || '').trim(),
         visitante: (vis || '').replace(/\s*Cuotas?:.*$/i, '').trim(),
-        mercados: [], cuota: null, _buf: []
+        mercados: [], cuota: null, _buf: [],
+        ...(inicioDe(linea) || pendiente || {})
       }
+      pendiente = null
       continue
     }
 
-    // cabecera de liga: no aporta nada y anuncia la siguiente selección
-    if (FECHA.test(linea)) { cerrar(); continue }
+    /* Cabecera de liga. No aporta mercados, pero SÍ trae el día y la hora
+       del partido que viene justo debajo. Antes se tiraba entera. */
+    const ini = inicioDe(linea)
+    if (ini) { cerrar(); pendiente = ini; continue }
 
     if (!actual) {
       // número suelto antes de cualquier partido: probablemente la cuota total
