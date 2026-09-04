@@ -18,6 +18,14 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [])
   const dias = proximos(apuestas, ahora)
+  /* Hoy y mañana se ven siempre; el resto solo si tocas su fecha. Con treinta
+     partidos por delante, enseñarlos todos convertía el resumen en un listado. */
+  const [diaExtra, setDiaExtra] = useState(null)
+  const cerca = dias.slice(0, 2)
+  const lejos = dias.slice(2)
+  const visibles = diaExtra
+    ? [...cerca, ...lejos.filter(d => d.dia === diaExtra)]
+    : cerca
 
   /* Dos cifras mandan y cuatro acompañan. Antes las seis pesaban igual y
      el rendimiento competía en tamaño con la banca, que es lo que de verdad
@@ -49,7 +57,7 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
               {dias.reduce((a, d) => a + d.horas.reduce((b, h) => b + h.items.length, 0), 0)}
             </span>
           </div>
-          {dias.map(d => (
+          {visibles.map(d => (
             <div className="prox-dia" key={d.dia}>
               <div className="prox-cab">{d.etiqueta}</div>
               {d.horas.map(h => (
@@ -71,10 +79,23 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
               ))}
             </div>
           ))}
+          {lejos.length > 0 && (
+            <div className="prox-fechas">
+              {lejos.map(d => (
+                <button key={d.dia}
+                        className={`prox-chip ${diaExtra === d.dia ? 'on' : ''}`}
+                        onClick={() => setDiaExtra(diaExtra === d.dia ? null : d.dia)}>
+                  {d.etiqueta}
+                  <em>{d.horas.reduce((a, h) => a + h.items.length, 0)}</em>
+                </button>
+              ))}
+            </div>
+          )}
+
           <p className="ayuda">
-            Solo los partidos aún sin resolver de boletos abiertos. Toca uno para abrir
-            su apuesta. Aquí no van importes a propósito: es la pantalla que miras con
-            el partido en curso.
+            Hoy y mañana siempre a la vista; toca una fecha para ver ese día. Solo salen
+            los partidos sin resolver de boletos abiertos. Aquí no van importes a
+            propósito: es la pantalla que miras con el partido en curso.
           </p>
         </div>
       )}
