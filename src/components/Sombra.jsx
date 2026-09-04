@@ -66,6 +66,7 @@ export default function Sombra({ toast }) {
   const [verArchivo, setVerArchivo] = useState(false)
   const [filtro, setFiltro] = useState('todos')
   const [panel, setPanel] = useState(null)
+  const [confirmarPerder, setConfirmarPerder] = useState(false)
 
   async function recargar() {
     const { data } = await supabase.from('sombra')
@@ -81,6 +82,19 @@ export default function Sombra({ toast }) {
     setRegistros(rs => rs.map(r => (r.id === id ? { ...r, acerto_ia: nuevo } : r)))
     const { error } = await supabase.from('sombra').update({ acerto_ia: nuevo }).eq('id', id)
     if (error) toast('No se pudo marcar')
+  }
+
+  /** Marca como irrecuperables las cuotas de partidos que ya pasaron. */
+  async function marcarPerdidas() {
+    const ids = registros
+      .filter(r => r.acerto_ia != null && !(Number(r.cuota_ia) > 1) && !r.cuota_perdida)
+      .map(r => r.id)
+    if (!ids.length) return setConfirmarPerder(false)
+    const { error } = await supabase.from('sombra').update({ cuota_perdida: true }).in('id', ids)
+    if (error) return toast('No se pudo marcar: ' + error.message)
+    setRegistros(rs => rs.map(r => (ids.includes(r.id) ? { ...r, cuota_perdida: true } : r)))
+    setConfirmarPerder(false)
+    toast(`${ids.length} marcadas · siguen contando para el acierto`)
   }
 
   async function guardarCuota(id, valor) {
@@ -111,7 +125,8 @@ export default function Sombra({ toast }) {
     }, {})
   ).filter(g => {
     const resueltos = g.items.filter(i => i.acerto_ia != null).length
-    const sinCuota = g.items.filter(i => i.acerto_ia != null && !(Number(i.cuota_ia) > 1)).length
+    const sinCuota = g.items.filter(
+      i => i.acerto_ia != null && !(Number(i.cuota_ia) > 1) && !i.cuota_perdida).length
     if (filtro === 'pendientes') return resueltos < g.items.length
     if (filtro === 'sincuota') return sinCuota > 0
     return true
@@ -133,7 +148,11 @@ export default function Sombra({ toast }) {
   const tasaReal = resueltas.length ? aciertos / resueltas.length : null
 
   const conCuota = resueltas.filter(r => Number(r.cuota_ia) > 1)
-  const sinCuota = resueltas.length - conCuota.length
+  /* Las de partidos pasados no se pueden completar: la casa ya no publica esa
+     cuota. Se separan del aviso, pero NO se borran: su acierto y su
+     probabilidad siguen alimentando la calibración. */
+  const sinCuota = resueltas.filter(r => !(Number(r.cuota_ia) > 1) && !r.cuota_perdida).length
+  const perdidas = resueltas.filter(r => !(Number(r.cuota_ia) > 1) && r.cuota_perdida).length
   const retorno = conCuota.reduce((s, r) => s + (r.acerto_ia ? Number(r.cuota_ia) - 1 : -1), 0)
   const yieldSombra = conCuota.length ? retorno / conCuota.length : null
   const cuotaMedia = conCuota.length
@@ -243,7 +262,31 @@ export default function Sombra({ toast }) {
           <strong>{sinCuota} estimaciones resueltas no tienen cuota.</strong> El yield solo
           cuenta las {conCuota.length} que sí la tienen. Si solo anotas la cuota de las que
           apostaste, el número mide tu criterio al elegir, no el del modelo. Anótalas todas.
+          <div style={{ marginTop: 10 }}>
+            {confirmarPerder ? (
+              <>
+                <strong>¿Dar por perdidas esas {sinCuota} cuotas?</strong>{' '}
+                No se borra nada: siguen contando para el acierto y la calibración.
+                Solo dejan de pedirte una cuota que ya no existe.
+                <div className="row c2" style={{ marginTop: 10 }}>
+                  <button className="act" onClick={marcarPerdidas}>Sí, son irrecuperables</button>
+                  <button className="ghost" onClick={() => setConfirmarPerder(false)}>Cancelar</button>
+                </div>
+              </>
+            ) : (
+              <button className="tiny" onClick={() => setConfirmarPerder(true)}>
+                Sus partidos ya pasaron y no puedo anotarlas
+              </button>
+            )}
+          </div>
         </div>
+      )}
+
+      {perdidas > 0 && (
+        <p className="ayuda">
+          {perdidas} estimaciones más quedaron sin cuota recuperable. Siguen contando
+          para el acierto y la calibración, pero no para el yield.
+        </p>
       )}
 
       {conCuota.length >= 30 && (
