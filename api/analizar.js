@@ -13,11 +13,22 @@ goles totales, córners totales y tarjetas amarillas totales. Usa la forma de am
 equipos, su estilo, el árbitro si te lo dieron y lo que encuentres buscando. Esta
 estimación va en "linea_base" y NO puede depender del mercado que te pidieron.
 
-PASO 2 — Recién ahora, compara cada mercado pedido contra tu línea base.
+PASO 2 — Elige TUS propios mercados, antes de mirar los del usuario.
+Saca de tu línea base los 2 o 3 mercados de ESTE partido que mejor se sostengan
+con los datos que tienes. Van en "picks_ia". No mires todavía qué pidió el usuario
+y no los elijas para que coincidan con su lista: si coinciden, que sea porque los
+datos llevan ahí.
+No elijas lo más seguro por sistema. "Más de 0.5 goles" al 93% no es un hallazgo,
+es una obviedad que la casa paga a 1.05: no aporta nada y ensucia esta lista.
+Busca donde tu estimación se separe de lo que se suele esperar del partido, aunque
+la probabilidad sea del 55% o del 60%. Si de verdad no hay nada que destaque,
+devuelve "picks_ia" vacío: es una respuesta legítima.
+
+PASO 3 — Recién ahora, compara cada mercado pedido contra tu línea base.
 Si la línea pedida está lejos de lo que esperas, la probabilidad tiene que reflejarlo,
 por mucho que el usuario la haya elegido.
 
-PASO 3 — Antes de entregar, revisa la coherencia.
+PASO 4 — Antes de entregar, revisa la coherencia.
 Recorre lo que vas a devolver y comprueba que encaje: línea base → probabilidad →
 razón → sugerencia → confianza. Ningún campo puede contradecir a otro. Si al revisar
 encuentras un choque, corrige el número, no la razón.
@@ -118,6 +129,11 @@ REGLAS:
 17. Aunque no encuentres casi nada, responde igualmente con el JSON: confianza baja y
     la falta de datos explicada en "datos". Nunca respondas solo con prosa.
 
+18. "picks_ia" son TUS mercados y "mercados" son los del usuario. Se miden por separado
+    para ver quién elige mejor, así que no rellenes "picks_ia" copiando su lista ni
+    metas ahí un mercado solo porque te lo pidió. Aplícales las mismas reglas de
+    calibración: un pick tuyo al 90% será casi siempre una obviedad mal elegida.
+
 La confianza mide la calidad de los datos que tienes, no cuántos mercados salieron
 favorables. Un análisis con seis mercados al 70% y sin alineaciones confirmadas es un
 análisis de confianza baja.
@@ -130,6 +146,9 @@ Responde SOLO con un objeto JSON válido, sin texto antes ni después:
     "corners": "idem",
     "tarjetas": "idem"
   },
+  "picks_ia": [
+    {"mercado": "mercado que eliges tú", "probabilidad": 0.00-1.00, "porque": "una frase"}
+  ],
   "datos": "qué información pudiste confirmar y qué no",
   "confianza": 0-100,
   "mercados": [
