@@ -394,6 +394,11 @@ export default function Sombra({ toast }) {
                   {g.competicion && <><span className="sep">·</span><span>{g.competicion}</span></>}
                   <span className="sep">·</span>
                   <span>{g.items.length} merc</span>
+                  {g.items.filter(i => i.veredicto?.startsWith('pick propio')).length > 0 && (
+                    <><span className="sep">·</span><span>
+                      {g.items.filter(i => i.veredicto?.startsWith('pick propio')).length} suyos
+                    </span></>
+                  )}
                   {hechas > 0 && <><span className="sep">·</span><span>{ok}/{hechas} ✓</span></>}
                   {faltanCuotas > 0 && (
                     <><span className="sep">·</span><span className="marca-casa">
@@ -415,6 +420,12 @@ export default function Sombra({ toast }) {
                     <div className="sel-row">
                       <div className="sel-txt">
                         {normalizar(r.mercado_ia)}
+                        {/* Sin esta marca, un pick suyo y uno tuyo con el mismo
+                            mercado y la misma probabilidad se ven idénticos y
+                            parecen un duplicado. */}
+                        {r.veredicto?.startsWith('pick propio') && (
+                          <em>lo eligió ella, no se lo pediste</em>
+                        )}
                         {r.veredicto?.startsWith('alternativa') && (
                           <em>{r.veredicto} — no la pediste tú, la propuso el modelo</em>
                         )}
