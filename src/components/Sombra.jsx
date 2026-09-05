@@ -67,6 +67,7 @@ export default function Sombra({ toast }) {
   const [filtro, setFiltro] = useState('todos')
   const [panel, setPanel] = useState(null)
   const [confirmarPerder, setConfirmarPerder] = useState(false)
+  const [confirmarBorrar, setConfirmarBorrar] = useState(null)
 
   async function recargar() {
     const { data } = await supabase.from('sombra')
@@ -109,6 +110,7 @@ export default function Sombra({ toast }) {
     const { error } = await supabase.from('sombra').delete().in('id', ids)
     if (error) return toast('No se pudo borrar')
     setRegistros(rs => rs.filter(r => !ids.includes(r.id)))
+    setConfirmarBorrar(null)
     toast('Análisis borrado')
   }
 
@@ -174,20 +176,114 @@ export default function Sombra({ toast }) {
     return normalizar(m)
   }
 
-  const porMercado    = agrupar(conCuota, r => normalizar(r.mercado_ia))
-  const porFamilia    = agrupar(conCuota, r => familiaDe(r.mercado_ia))
-  const porLiga       = agrupar(conCuota, r => r.competicion)
+  const porMercado   = agrupar(conCuota, r => normalizar(r.mercado_ia))
+  const porFamilia   = agrupar(conCuota, r => familiaDe(r.mercado_ia))
+  const porLiga      = agrupar(conCuota, r => r.competicion)
   /* La comparación que importa: quién elige mejor. Por yield y no por acierto,
      porque quien elige lo más seguro gana siempre en acierto y pierde dinero. */
-  const porOrigen = agrupar(conCuota, origenDe)
-
-  const porConfianza  = agrupar(conCuota, r => {
+  const porOrigen    = agrupar(conCuota, origenDe)
+  const porConfianza = agrupar(conCuota, r => {
     const c = Number(r.confianza)
     if (!c) return 'sin confianza'
     if (c < 50) return 'confianza baja (<50)'
     if (c < 65) return 'confianza media (50-64)'
     return 'confianza alta (65+)'
   })
+
+  /* Cuántas estimaciones que NO pediste tú siguen sin cuota. Si no las anotas,
+     la comparación de origen no puede existir: sus grupos quedan vacíos. */
+  const suyasSinCuota = resueltas.filter(
+    r => r.veredicto && !(Number(r.cuota_ia) > 1) && !r.cuota_perdida).length
+
+  function tarjeta(g) {
+    const hechas = g.items.filter(i => i.acerto_ia != null).length
+    const ok = g.items.filter(i => i.acerto_ia === true).length
+    const faltanCuotas = g.items.filter(
+      i => i.acerto_ia != null && !(Number(i.cuota_ia) > 1) && !i.cuota_perdida).length
+    const suyos = g.items.filter(i => i.veredicto?.startsWith('pick propio')).length
+    const completo = hechas === g.items.length
+    const ab = abierto === g.clave
+    return (
+      <article className={`bet compacta ${completo ? 'ganada' : 'pendiente'}`} key={g.clave}>
+        <button className="bet-cabecera" onClick={() => setAbierto(ab ? null : g.clave)}
+                aria-expanded={ab}>
+          <div className="bet-izq">
+            <div className="cola-nom">{g.partido}</div>
+            <div className="bet-meta">
+              <span>{g.fecha.slice(5)}</span>
+              {g.competicion && <><span className="sep">·</span><span>{g.competicion}</span></>}
+              <span className="sep">·</span>
+              <span>{g.items.length} merc</span>
+              {suyos > 0 && <><span className="sep">·</span><span>{suyos} suyos</span></>}
+              {hechas > 0 && <><span className="sep">·</span><span>{ok}/{hechas} ✓</span></>}
+              {faltanCuotas > 0 && (
+                <><span className="sep">·</span><span className="marca-casa">
+                  {faltanCuotas} sin cuota
+                </span></>
+              )}
+            </div>
+          </div>
+          <div className="bet-der">
+            <span className="chevron" aria-hidden="true">{ab ? '−' : '+'}</span>
+          </div>
+        </button>
+
+        {ab && (
+          <div className="bet-cuerpo">
+            {g.razonamiento && <p className="razonamiento">{g.razonamiento}</p>}
+            {g.items.map(r => (
+              <div className="sel" key={r.id}>
+                <div className="sel-row">
+                  <div className="sel-txt">
+                    {normalizar(r.mercado_ia)}
+                    {/* Sin esta marca, un pick suyo y uno tuyo con el mismo
+                        mercado y la misma probabilidad se ven idénticos y
+                        parecen un duplicado. */}
+                    {r.veredicto?.startsWith('pick propio') && (
+                      <em>lo eligió ella, no se lo pediste</em>
+                    )}
+                    {r.veredicto?.startsWith('alternativa') && (
+                      <em>{r.veredicto} — la propuso el modelo, no la pediste</em>
+                    )}
+                  </div>
+                  <span className="odd">{r.prob_ia == null ? '—' : pct(Number(r.prob_ia))}</span>
+                </div>
+                <div className="row c2" style={{ marginTop: 8, marginBottom: 8 }}>
+                  <CampoLento id={`cu-${r.id}`} etiqueta="Cuota de la casa"
+                              valor={r.cuota_ia ?? ''} inputMode="decimal"
+                              placeholder="1.85"
+                              onGuardar={v => guardarCuota(r.id, v)} />
+                  <div className="marks" style={{ alignSelf: 'end', marginBottom: 4 }}>
+                    <button className={`tiny win ${r.acerto_ia === true ? 'on' : ''}`}
+                            onClick={() => marcar(r.id, true)}>✓</button>
+                    <button className={`tiny lose ${r.acerto_ia === false ? 'on' : ''}`}
+                            onClick={() => marcar(r.id, false)}>✗</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {confirmarBorrar === g.clave ? (
+              <div className="flag" style={{ marginTop: 10 }}>
+                <strong>¿Borrar este análisis?</strong> Se van sus {g.items.length} estimaciones
+                y con ellas su parte del acierto y del yield. No se puede recuperar.
+                <div className="row c2" style={{ marginTop: 10 }}>
+                  <button className="act" onClick={() => borrarGrupo(g.clave)}>Sí, borrar</button>
+                  <button className="ghost" onClick={() => setConfirmarBorrar(null)}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <div className="bet-pie">
+                <button className="tiny" onClick={() => setConfirmarBorrar(g.clave)}>
+                  Borrar análisis
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </article>
+    )
+  }
 
   if (!registros.length) {
     return (
@@ -319,12 +415,22 @@ export default function Sombra({ toast }) {
           {panelBtn('liga', 'Por competición', porLiga, 5)}
           {panelBtn('origen', '¿Quién elige mejor?', porOrigen, 3)}
           {panel === 'origen' && (
-            <p className="ayuda">
-              Mira el yield, no el acierto. Quien elige lo más seguro gana siempre en
-              acierto y pierde dinero igual. Y no decidas nada hasta tener unas cuantas
-              decenas de cada grupo: con diez estimaciones esto no distingue destreza
-              de suerte.
-            </p>
+            <>
+              {suyasSinCuota > 0 && (
+                <div className="flag">
+                  <strong>Faltan {suyasSinCuota} cuotas de picks suyos y alternativas.</strong>{' '}
+                  Esta comparación solo cuenta lo que tiene cuota anotada. Si solo apuntas
+                  las que apostaste, sus mercados no aparecen aquí y la tabla acaba midiendo
+                  el tuyo contra nada. Anótalas aunque no las jugaras.
+                </div>
+              )}
+              <p className="ayuda">
+                Mira el yield, no el acierto. Quien elige lo más seguro gana siempre en
+                acierto y pierde dinero igual. Y aunque ella salga por delante, eso no
+                significa que le gane al mercado: podéis estar los dos por debajo del
+                precio justo.
+              </p>
+            </>
           )}
           {panelBtn('confianza', 'Por confianza declarada', porConfianza, 5)}
 
@@ -355,9 +461,7 @@ export default function Sombra({ toast }) {
         <span className="contador">{abiertos.length}</span>
       </div>
 
-      {abiertos.length === 0 && (
-        <div className="empty">Nada pendiente de marcar.</div>
-      )}
+      {abiertos.length === 0 && <div className="empty">Nada pendiente de marcar.</div>}
 
       {abiertos.map(tarjeta)}
 
@@ -376,84 +480,4 @@ export default function Sombra({ toast }) {
       )}
     </section>
   )
-
-  function tarjeta(g) {
-    const hechas = g.items.filter(i => i.acerto_ia != null).length
-        const ok = g.items.filter(i => i.acerto_ia === true).length
-        const faltanCuotas = g.items.filter(i => i.acerto_ia != null && !(Number(i.cuota_ia) > 1)).length
-        const completo = hechas === g.items.length
-        const ab = abierto === g.clave
-        return (
-          <article className={`bet compacta ${completo ? 'ganada' : 'pendiente'}`} key={g.clave}>
-            <button className="bet-cabecera" onClick={() => setAbierto(ab ? null : g.clave)}
-                    aria-expanded={ab}>
-              <div className="bet-izq">
-                <div className="cola-nom">{g.partido}</div>
-                <div className="bet-meta">
-                  <span>{g.fecha.slice(5)}</span>
-                  {g.competicion && <><span className="sep">·</span><span>{g.competicion}</span></>}
-                  <span className="sep">·</span>
-                  <span>{g.items.length} merc</span>
-                  {g.items.filter(i => i.veredicto?.startsWith('pick propio')).length > 0 && (
-                    <><span className="sep">·</span><span>
-                      {g.items.filter(i => i.veredicto?.startsWith('pick propio')).length} suyos
-                    </span></>
-                  )}
-                  {hechas > 0 && <><span className="sep">·</span><span>{ok}/{hechas} ✓</span></>}
-                  {faltanCuotas > 0 && (
-                    <><span className="sep">·</span><span className="marca-casa">
-                      {faltanCuotas} sin cuota
-                    </span></>
-                  )}
-                </div>
-              </div>
-              <div className="bet-der">
-                <span className="chevron" aria-hidden="true">{ab ? '−' : '+'}</span>
-              </div>
-            </button>
-
-            {ab && (
-              <div className="bet-cuerpo">
-                {g.razonamiento && <p className="razonamiento">{g.razonamiento}</p>}
-                {g.items.map(r => (
-                  <div className="sel" key={r.id}>
-                    <div className="sel-row">
-                      <div className="sel-txt">
-                        {normalizar(r.mercado_ia)}
-                        {/* Sin esta marca, un pick suyo y uno tuyo con el mismo
-                            mercado y la misma probabilidad se ven idénticos y
-                            parecen un duplicado. */}
-                        {r.veredicto?.startsWith('pick propio') && (
-                          <em>lo eligió ella, no se lo pediste</em>
-                        )}
-                        {r.veredicto?.startsWith('alternativa') && (
-                          <em>{r.veredicto} — no la pediste tú, la propuso el modelo</em>
-                        )}
-                      </div>
-                      <span className="odd">{r.prob_ia == null ? '—' : pct(Number(r.prob_ia))}</span>
-                    </div>
-                    <div className="row c2" style={{ marginTop: 8, marginBottom: 8 }}>
-                      <CampoLento id={`cu-${r.id}`} etiqueta="Cuota de la casa"
-                                  valor={r.cuota_ia ?? ''} inputMode="decimal"
-                                  placeholder="1.85"
-                                  onGuardar={v => guardarCuota(r.id, v)} />
-                      <div className="marks" style={{ alignSelf: 'end', marginBottom: 4 }}>
-                        <button className={`tiny win ${r.acerto_ia === true ? 'on' : ''}`}
-                                onClick={() => marcar(r.id, true)}>✓</button>
-                        <button className={`tiny lose ${r.acerto_ia === false ? 'on' : ''}`}
-                                onClick={() => marcar(r.id, false)}>✗</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div className="bet-pie">
-                  <button className="tiny" onClick={() => borrarGrupo(g.clave)}>
-                    Borrar análisis
-                  </button>
-                </div>
-              </div>
-            )}
-          </article>
-    )
-  }
 }
