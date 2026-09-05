@@ -31,6 +31,7 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
   const [verGanadas, setVerGanadas] = useState(true)
   /* Confirmación de borrado: guarda el id de la apuesta que está esperando el sí. */
   const [confirmando, setConfirmando] = useState(null)
+  const [confirmarPerdida, setConfirmarPerdida] = useState(null)
 
   /* Al entrar desde la franja de Próximos no basta con cambiar de pestaña:
      con decenas de asientos habría que buscar el boleto a mano. Se abre y se
@@ -150,6 +151,29 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
     if (error) return toast('No se pudo deshacer')
     await sincronizarFecha({ ...a, cash_out: null }, a.selecciones || [])
     toast('Cierre deshecho'); onCambio()
+  }
+
+  /**
+   * Da el boleto por perdido entero. En una combinada larga basta una pata
+   * caída para que el resto no cambie nada: obligar a marcar las otras
+   * veintinueve sería pedir que inventes resultados que no comprobaste.
+   * Las pendientes se quedan pendientes, que es la verdad.
+   */
+  async function darPorPerdida(a) {
+    const { error } = await supabase.from('apuestas')
+      .update({ perdida_manual: true }).eq('id', a.id)
+    if (error) return toast('No se pudo marcar: ' + error.message)
+    await sincronizarFecha({ ...a, perdida_manual: true }, a.selecciones || [])
+    setConfirmarPerdida(null)
+    toast('Boleto dado por perdido'); onCambio()
+  }
+
+  async function reabrir(a) {
+    const { error } = await supabase.from('apuestas')
+      .update({ perdida_manual: false }).eq('id', a.id)
+    if (error) return toast('No se pudo reabrir')
+    await sincronizarFecha({ ...a, perdida_manual: false }, a.selecciones || [])
+    toast('Boleto reabierto'); onCambio()
   }
 
   async function borrar(id) {
@@ -324,7 +348,27 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
               </div>
             )}
 
+            {confirmarPerdida === a.id && (
+              <div className="flag">
+                <strong>¿Dar todo el boleto por perdido?</strong>{' '}
+                Las patas que siguen pendientes se quedan así: no hace falta
+                marcarlas porque ya no cambian nada. Se puede deshacer.
+                <div className="row c2" style={{ marginTop: 10 }}>
+                  <button className="act" onClick={() => darPorPerdida(a)}>Sí, se perdió</button>
+                  <button className="ghost" onClick={() => setConfirmarPerdida(null)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+
             <div className="bet-pie">
+              {e === 'pendiente' && cerrando !== a.id && confirmarPerdida !== a.id && (
+                <button className="tiny" onClick={() => setConfirmarPerdida(a.id)}>
+                  Se perdió
+                </button>
+              )}
+              {a.perdida_manual && (
+                <button className="tiny" onClick={() => reabrir(a)}>Reabrir boleto</button>
+              )}
               {e === 'pendiente' && cerrando !== a.id && (
                 <button className="tiny" onClick={() => { setCerrando(a.id); setImporte('') }}>
                   Cerrar apuesta
