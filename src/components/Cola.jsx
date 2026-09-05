@@ -57,6 +57,7 @@ export default function Cola({ toast }) {
   const [confirmarBorrar, setConfirmarBorrar] = useState(null)
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false)
   const [confirmarLimpiarPie, setConfirmarLimpiarPie] = useState(false)
+  const [guardados, setGuardados] = useState([])
   const [cupon, setCupon] = useState('')
   const [ligaCupon, setLigaCupon] = useState('')
   const [paisCupon, setPaisCupon] = useState('')
@@ -342,8 +343,12 @@ export default function Cola({ toast }) {
   }
 
   async function guardarEnSombra(it) {
+    /* Sin este cerrojo, dos toques guardaban el análisis entero dos veces y
+       en Sombra aparecían mercados repetidos que parecían un fallo del modelo. */
+    if (guardados.includes(it.id)) return toast('Ese análisis ya está en Sombra')
     const lista = it.respuesta?.mercados || []
     if (!lista.length) return toast('Nada que guardar')
+    setGuardados(g => [...g, it.id])
 
     const base = it.respuesta.linea_base
     const razonamiento = [
@@ -390,7 +395,10 @@ export default function Cola({ toast }) {
     ]
 
     const { error } = await supabase.from('sombra').insert(filas)
-    if (error) return toast('No se pudo guardar: ' + error.message)
+    if (error) {
+      setGuardados(g => g.filter(x => x !== it.id))   // falló: se puede reintentar
+      return toast('No se pudo guardar: ' + error.message)
+    }
     toast(
       `${lista.length} guardadas` +
       (picks.length ? ` + ${picks.length} suyas` : '') +
@@ -773,8 +781,9 @@ export default function Cola({ toast }) {
                               )}
 
                               <button className="act" style={{ marginTop: 12 }}
+                                      disabled={guardados.includes(it.id)}
                                       onClick={() => guardarEnSombra(it)}>
-                                Guardar en sombra
+                                {guardados.includes(it.id) ? 'Ya está en Sombra' : 'Guardar en sombra'}
                               </button>
                             </>
                           )}
