@@ -35,6 +35,9 @@ export const esCombinada = apuesta => patasApuesta(apuesta) > 1
  */
 export function estadoApuesta(a) {
   if (a && a.cash_out !== null && a.cash_out !== undefined && a.cash_out !== '') return 'cerrada'
+  /* Dado por perdido a mano: una pata cayó y el resto ya no decide nada.
+     Manda sobre las selecciones, que pueden seguir pendientes para siempre. */
+  if (a?.perdida_manual) return 'perdida'
   return estado(a?.selecciones || [])
 }
 
@@ -97,6 +100,9 @@ export function resultado(apuesta) {
   // cierre anticipado: manda lo que devolvió la casa
   if (apuesta.cash_out !== null && apuesta.cash_out !== undefined && apuesta.cash_out !== '')
     return Number(apuesta.cash_out) - stake
+
+  // dado por perdido entero: se pierde el stake y no se mira nada más
+  if (apuesta.perdida_manual) return -stake
 
   const e = estado(sel)
   if (e === 'pendiente') return 0
