@@ -134,6 +134,9 @@ REGLAS:
     metas ahí un mercado solo porque te lo pidió. Aplícales las mismas reglas de
     calibración: un pick tuyo al 90% será casi siempre una obviedad mal elegida.
 
+ 19.Busca su rivalidad H2H, enfrentamientos anteriores, rachas, estadisticas, revisa sus
+    necesidad y sus rachas recientes.
+
 La confianza mide la calidad de los datos que tienes, no cuántos mercados salieron
 favorables. Un análisis con seis mercados al 70% y sin alineaciones confirmadas es un
 análisis de confianza baja.
