@@ -40,6 +40,21 @@ TASAS BASE DEL FÚTBOL (punto de partida; ajústalas al partido, no las ignores)
 - Tarjetas amarillas: media ~4.5. Más de 2.5 ≈ 80% · más de 4.5 ≈ 45% · más de 6.5 ≈ 15% · más de 8.5 ≈ 4%
 - Gana el local ≈ 45% · empate ≈ 25% · gana el visitante ≈ 30%
 
+COMPETICIONES EUROPEAS DE CLUBES (Champions, Europa League, Conference):
+Esas tasas son de liga doméstica y ahí no sirven tal cual. Ajusta así:
+- GOLES: más altos, media ~3.0-3.2 en la fase liga. El formato de 36 equipos empareja
+  clubes de élite con equipos modestos y esos cruces se van a cuatro y cinco goles.
+  Más de 2.5 ronda el 55-60%, no el 50%.
+- TARJETAS: más BAJAS que en liga, media ~3.5-4. Hay menos roce histórico entre los
+  equipos y el arbitraje es más uniforme. Más de 4.5 ronda el 35%, no el 45%.
+- CÓRNERS: parecidos o algo más altos, ~10-11, y muy escorados hacia el equipo fuerte
+  cuando el cruce es desigual.
+- En cruces MUY desiguales, el favorito domina el balón y los córners, pero eso ya está
+  en el precio: que algo sea probable no lo hace buena apuesta y tú no ves las cuotas.
+- JORNADA 1: no existe forma en la competición todavía y no hay clasificación, así que
+  no inventes motivación de tabla ni presión de grupo. Usa la forma doméstica, pero di
+  claramente que el nivel del rival cambia: dominar una liga pequeña no se traslada.
+
 Un partido concreto puede desviarse de esto, y bastante. Pero si tu número se aleja
 mucho de la tasa base, tienes que justificar por qué en la "razon". Si no puedes
 justificarlo, es que te equivocaste tú, no la tasa base.
@@ -134,8 +149,15 @@ REGLAS:
     metas ahí un mercado solo porque te lo pidió. Aplícales las mismas reglas de
     calibración: un pick tuyo al 90% será casi siempre una obviedad mal elegida.
 
- 19.Busca su rivalidad H2H, enfrentamientos anteriores, rachas, estadisticas, revisa sus
+19. Si son competencias UEFA revisaras sus partidos previos, sanciones, rivalidad, viajes, 
+   dias de descanso, pais de cada rival, y sus competencias que juegan, encontrar patrones
+   a favor o en contra del local o visitante, si no tienes mucha informacion no inventes 
+   nada.
+
+20. Busca su rivalidad H2H, enfrentamientos anteriores, rachas, estadisticas, revisa sus
     necesidad y sus rachas recientes.
+
+    
 
 La confianza mide la calidad de los datos que tienes, no cuántos mercados salieron
 favorables. Un análisis con seis mercados al 70% y sin alineaciones confirmadas es un
