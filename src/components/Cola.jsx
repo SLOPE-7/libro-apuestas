@@ -727,7 +727,7 @@ export default function Cola({ toast }) {
                               )}
                               {!!it.respuesta.picks_ia?.length && (
                                 <div className="sel">
-                                  <span className="eyebrow">Lo que ella habría elegido</span>
+                                  <span className="eyebrow">Mercados IA</span>
                                   {it.respuesta.picks_ia.map((g, k) => (
                                     <div className="sel-row" key={k}>
                                       <div className="sel-txt">
