@@ -240,10 +240,10 @@ export default function Sombra({ toast }) {
                         mercado y la misma probabilidad se ven idénticos y
                         parecen un duplicado. */}
                     {r.veredicto?.startsWith('pick propio') && (
-                      <em>lo eligió ella, no se lo pediste</em>
+                      <em>Mercados IA</em>
                     )}
                     {r.veredicto?.startsWith('alternativa') && (
-                      <em>{r.veredicto} — la propuso el modelo, no la pediste</em>
+                      <em>{r.veredicto} — Sugerencias IA</em>
                     )}
                   </div>
                   <span className="odd">{r.prob_ia == null ? '—' : pct(Number(r.prob_ia))}</span>
