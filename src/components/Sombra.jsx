@@ -10,9 +10,9 @@ const signo = v => (v < 0 ? 'neg' : v > 0 ? 'pos' : '')
  *  una corrección a algo tuyo que no se sostenía. */
 function origenDe(r) {
   const v = String(r.veredicto || '')
-  if (v.startsWith('pick propio')) return 'Los eligió ella'
+  if (v.startsWith('pick propio')) return 'Mercados de la IA'
   if (v.startsWith('alternativa'))  return 'Correcciones suyas'
-  return 'Los pediste tú'
+  return 'Tus Mercados'
 }
 
 /** Agrupa por una clave y calcula acierto y yield de cada grupo. */
