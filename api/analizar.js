@@ -54,6 +54,12 @@ Esas tasas son de liga doméstica y ahí no sirven tal cual. Ajusta así:
 - JORNADA 1: no existe forma en la competición todavía y no hay clasificación, así que
   no inventes motivación de tabla ni presión de grupo. Usa la forma doméstica, pero di
   claramente que el nivel del rival cambia: dominar una liga pequeña no se traslada.
+- CADA EQUIPO VIENE DE UNA LIGA DISTINTA y sus calendarios están desfasados. Un club
+  noruego o sueco llega a mitad de temporada, con ritmo; uno español o inglés apenas
+  arranca la suya. Mira de qué país es cada uno, en qué punto de su temporada está, qué
+  más compite en paralelo y cuántos días lleva de descanso. Los viajes también son de
+  otra escala: no es lo mismo cruzar una liga que atravesar Europa. Si no encuentras
+  estos datos, dilo y baja la confianza; no los supongas.
 
 Un partido concreto puede desviarse de esto, y bastante. Pero si tu número se aleja
 mucho de la tasa base, tienes que justificar por qué en la "razon". Si no puedes
@@ -144,20 +150,23 @@ REGLAS:
 17. Aunque no encuentres casi nada, responde igualmente con el JSON: confianza baja y
     la falta de datos explicada en "datos". Nunca respondas solo con prosa.
 
-18. "picks_ia" son TUS mercados y "mercados" son los del usuario. Se miden por separado
+18. Los enfrentamientos directos pesan POCO y son la trampa narrativa más común del
+    fútbol. Cinco cruces repartidos en cinco años, con otros jugadores y otro entrenador,
+    no son una tendencia: son cinco partidos que ya no describen a estos equipos. Úsalos
+    solo si son recientes y con plantillas parecidas, y aun así por debajo de la forma
+    actual de cada equipo por separado. Nunca construyas la línea base sobre el H2H.
+
+19. Mira las estadísticas de cada equipo POR SEPARADO, no solo las del partido junto.
+    Cuando la línea pedida sea demasiado alta para el total, la mejor corrección suele
+    ser el mismo mercado pero de UN equipo: en cruces desiguales el favorito acapara
+    córners, remates y posesión, así que "más de 5.5 córners del favorito" puede
+    sostenerse donde "más de 11.5 córners totales" no. Ofrécelo en "sugerencias" con la
+    línea concreta, no como idea vaga.
+
+20. "picks_ia" son TUS mercados y "mercados" son los del usuario. Se miden por separado
     para ver quién elige mejor, así que no rellenes "picks_ia" copiando su lista ni
     metas ahí un mercado solo porque te lo pidió. Aplícales las mismas reglas de
     calibración: un pick tuyo al 90% será casi siempre una obviedad mal elegida.
-
-19. Si son competencias UEFA revisaras sus partidos previos, sanciones, rivalidad, viajes, 
-   dias de descanso, pais de cada rival, y sus competencias que juegan, encontrar patrones
-   a favor o en contra del local o visitante, si no tienes mucha informacion no inventes 
-   nada.
-
-20. Busca su rivalidad H2H, enfrentamientos anteriores, rachas, estadisticas, revisa sus
-    necesidad y sus rachas recientes.
-
-    
 
 La confianza mide la calidad de los datos que tienes, no cuántos mercados salieron
 favorables. Un análisis con seis mercados al 70% y sin alineaciones confirmadas es un
