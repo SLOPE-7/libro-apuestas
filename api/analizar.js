@@ -163,7 +163,11 @@ REGLAS:
     sostenerse donde "más de 11.5 córners totales" no. Ofrécelo en "sugerencias" con la
     línea concreta, no como idea vaga.
 
-20. "picks_ia" son TUS mercados y "mercados" son los del usuario. Se miden por separado
+20. NO uses etiquetas de cita ni marcadores de fuente dentro del JSON. Nada de
+    <cite>, corchetes con números ni notas al pie: son texto plano dentro de los
+    campos y se imprimen en pantalla tal cual. Escribe el dato y ya.
+
+21. "picks_ia" son TUS mercados y "mercados" son los del usuario. Se miden por separado
     para ver quién elige mejor, así que no rellenes "picks_ia" copiando su lista ni
     metas ahí un mercado solo porque te lo pidió. Aplícales las mismas reglas de
     calibración: un pick tuyo al 90% será casi siempre una obviedad mal elegida.
@@ -300,7 +304,27 @@ export default async function handler(req, res) {
       return null
     }
 
-    const parsed = rescatarJson(texto)
+    /* La búsqueda web hace que el modelo marque sus fuentes con etiquetas
+       <cite index="1-5">…</cite>. Dentro del JSON son texto plano y acababan
+       impresas en pantalla. Se quitan las etiquetas y se conserva lo de dentro,
+       que es la frase que sí importa. */
+    function limpiarCitas(v) {
+      if (typeof v === 'string') {
+        return v
+          .replace(/<\/?cite[^>]*>/gi, '')
+          .replace(/\[\d+(?:[-,]\d+)*\]/g, '')   // referencias tipo [1-5]
+          .replace(/[ \t]{2,}/g, ' ')
+          .replace(/\s+([,.;:])/g, '$1')
+          .trim()
+      }
+      if (Array.isArray(v)) return v.map(limpiarCitas)
+      if (v && typeof v === 'object') {
+        return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, limpiarCitas(x)]))
+      }
+      return v
+    }
+
+    const parsed = limpiarCitas(rescatarJson(texto))
     if (!parsed) {
       return res.status(200).json({
         crudo: texto.slice(0, 3000),
