@@ -123,6 +123,31 @@ export function resultado(apuesta) {
 }
 
 /**
+ * CUOTA MÍNIMA para no perder dinero con esa probabilidad.
+ *
+ * Si algo ocurre el 66% de las veces, cobrarlo a menos de 1.52 pierde
+ * dinero por mucho que aciertes casi siempre. Es el número que convierte
+ * "cuál es más seguro" en "cuál me pagan por encima de lo que vale", que
+ * es la pregunta correcta y la que casi nadie se hace.
+ */
+export function cuotaMinima(prob) {
+  const p = Number(prob)
+  if (!Number.isFinite(p) || p <= 0 || p > 1) return null
+  return 1 / p
+}
+
+/**
+ * Qué margen te deja la casa sobre esa probabilidad, en tanto por uno.
+ * Positivo = te pagan de más. Negativo = pierdes aunque aciertes.
+ */
+export function margenSobreCuota(prob, cuota) {
+  const min = cuotaMinima(prob)
+  const c = Number(cuota)
+  if (min == null || !Number.isFinite(c) || c <= 1) return null
+  return c / min - 1
+}
+
+/**
  * EXPOSICIÓN REPETIDA.
  *
  * Cuando el mismo mercado del mismo partido está en varios boletos vivos, esos
