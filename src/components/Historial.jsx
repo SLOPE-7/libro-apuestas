@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   cuotaApuesta, cuotaTotal, estadoApuesta, estadoSeleccion,
-  resultado, valorCierre, tieneAnuladaParcial, patasApuesta
-} from '../lib/calc'
+  resultado, valorCierre, tieneAnuladaParcial, patasApuesta, exposicion} from '../lib/calc'
+import { Escudo } from './Escudo'
 
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v).toFixed(2)
 
@@ -32,6 +32,9 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
   /* Confirmación de borrado: guarda el id de la apuesta que está esperando el sí. */
   const [confirmando, setConfirmando] = useState(null)
   const [confirmarPerdida, setConfirmarPerdida] = useState(null)
+  const [verExpo, setVerExpo] = useState(false)
+  const expo = exposicion(apuestas)
+  const expoTotal = expo.reduce((t, x) => t + x.stake, 0)
 
   /* Al entrar desde la franja de Próximos no basta con cambiar de pestaña:
      con decenas de asientos habría que buscar el boleto a mano. Se abre y se
@@ -261,7 +264,9 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
               return (
                 <div className={`sel sel-${es}`} key={s.id}>
                   <div className="sel-row">
-                    <div className="sel-txt"><b>{s.partido}</b></div>
+                    <div className="sel-txt">
+                      <b><Escudo equipo={s.partido} /> {s.partido}</b>
+                    </div>
                     <span className="odd">{Number(s.cuota).toFixed(2)}</span>
                   </div>
 
@@ -418,6 +423,48 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
           <button className="mini" onClick={revertir}>Deshacer</button>
           <button className="mini" onClick={() => setDeshacer(null)}>Está bien</button>
         </div>
+      )}
+
+      {expo.length > 0 && (
+        <>
+          <button className="grupo-cab perdida" onClick={() => setVerExpo(v => !v)}
+                  aria-expanded={verExpo}>
+            <span className="grupo-tit">Riesgo repetido</span>
+            <span className="grupo-datos">
+              <span className="monto neg">{money(expoTotal)}</span>
+              <span className="chevron">{verExpo ? '−' : '+'}</span>
+            </span>
+          </button>
+
+          {verExpo && (
+            <div className="card">
+              <p className="ayuda" style={{ marginTop: 0 }}>
+                Mercados que se repiten en varios boletos vivos. Firmaste esos boletos
+                por separado, pero un solo resultado los tumba todos a la vez.
+              </p>
+              {expo.map(x => (
+                <div className="sel" key={x.partido + x.mercado}>
+                  <div className="sel-row">
+                    <div className="sel-txt">
+                      <b>{x.partido}</b>
+                      <em>{x.mercado}</em>
+                    </div>
+                    <span className="odd neg">{money(x.stake)}</span>
+                  </div>
+                  <p className="ayuda" style={{ margin: '4px 0 0' }}>
+                    En {x.boletos} boletos. Si no se cumple, pierdes {money(x.stake)} de golpe.
+                  </p>
+                </div>
+              ))}
+              <div className="flag" style={{ marginTop: 10 }}>
+                <strong>Esto no es lo mismo que arriesgar {money(expoTotal)} en apuestas
+                distintas.</strong> Repetir un mercado en varios boletos concentra el riesgo
+                en un solo resultado en lugar de repartirlo. Los boletos parecen
+                independientes y no lo son.
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {atrasadas.length > 0 && (
