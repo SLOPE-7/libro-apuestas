@@ -208,7 +208,8 @@ export default function Cola({ toast }) {
   async function anadir() {
     if (!nuevo.local.trim() || !nuevo.visitante.trim())
       return toast('Escribe los dos equipos')
-    if (!mercados.length) {
+    // en modo "los elige ella" no hay lista que exigir: ese es el punto
+    if (quienElige === 'yo' && !mercados.length) {
       setVerMercados(true)
       return toast('Elige al menos un mercado')
     }
@@ -329,8 +330,11 @@ export default function Cola({ toast }) {
 
   async function analizarSeleccion() {
     if (!seleccion.length) return toast('Marca los partidos a analizar')
-    const sinMercados = items.filter(i => seleccion.includes(i.id) && !(i.mercados || []).length)
-    if (sinMercados.length) return toast('Hay partidos marcados sin mercados elegidos')
+    /* Un partido sin mercados es válido si lleva techo: significa que los
+       elige el modelo. Solo se queja si no hay ni lista ni techo. */
+    const sinNada = items.filter(i =>
+      seleccion.includes(i.id) && !(i.mercados || []).length && !i.tope)
+    if (sinNada.length) return toast('Hay partidos sin mercados ni techo')
 
     setCorriendo(true)
 
@@ -871,7 +875,9 @@ export default function Cola({ toast }) {
                             <div className="cola-meta">
                               {it.hora || 'sin hora'}
                               {yaEmpezo && ' · YA EMPEZÓ'}
-                              {` · ${susMercados.length} merc`}
+                              {susMercados.length
+                                ? ` · ${susMercados.length} merc`
+                                : it.tope ? ` · hasta ${it.tope} · los elige ella` : ''}
                               {` · ${ESTADO_TXT[it.estado]}`}
                               {it.respuesta?.confianza != null && ` · conf ${it.respuesta.confianza}`}
                             </div>
