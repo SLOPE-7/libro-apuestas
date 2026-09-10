@@ -404,7 +404,10 @@ export default function Cola({ toast }) {
        en Sombra aparecían mercados repetidos que parecían un fallo del modelo. */
     if (guardados.includes(it.id)) return toast('Ese análisis ya está en Sombra')
     const lista = it.respuesta?.mercados || []
-    if (!lista.length) return toast('Nada que guardar')
+    /* En modo "los elige ella" no hay mercados tuyos y todo está en picks_ia:
+       exigir la lista dejaba el análisis sin poder guardarse. */
+    if (!lista.length && !(it.respuesta?.picks_ia || []).length)
+      return toast('Nada que guardar')
     setGuardados(g => [...g, it.id])
 
     const base = it.respuesta.linea_base
@@ -1003,7 +1006,8 @@ export default function Cola({ toast }) {
                             </>
                           )}
 
-                          {it.respuesta?.error && !it.respuesta?.mercados && (
+                          {it.respuesta?.error && !it.respuesta?.mercados?.length
+                            && !it.respuesta?.picks_ia?.length && (
                             <div className="flag">
                               <strong>No se pudo analizar.</strong> {it.respuesta.error}
                               {it.respuesta.detalle && (
