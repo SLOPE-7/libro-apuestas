@@ -18,6 +18,8 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [])
   const dias = proximos(apuestas, ahora)
+  const reducirMovimiento = typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   /* Hoy y mañana se ven siempre; el resto solo si tocas su fecha. Con treinta
      partidos por delante, enseñarlos todos convertía el resumen en un listado. */
   const [diaExtra, setDiaExtra] = useState(null)
@@ -152,8 +154,13 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
                     background: '#F6F5F1', border: '1px solid #9EA093',
                     borderRadius: 0, fontSize: 12
                   }} />
+                {/* La curva se dibuja al entrar, como trazada a mano en el libro.
+                    Es el único movimiento no pedido de toda la app: se gasta aquí
+                    porque la curva es lo más característico de un libro de apuestas. */}
                 <Line type="monotone" dataKey="banca" stroke="#22282C"
-                      strokeWidth={2} dot={false} />
+                      strokeWidth={2} dot={false}
+                      isAnimationActive={!reducirMovimiento}
+                      animationDuration={900} animationEasing="ease-out" />
               </LineChart>
             </ResponsiveContainer>
           </div>
