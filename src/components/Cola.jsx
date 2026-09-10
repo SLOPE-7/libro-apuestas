@@ -64,9 +64,16 @@ export default function Cola({ toast }) {
 
   const esperas = useRef({})
 
-  const [nuevo, setNuevo] = useState({
-    local: '', visitante: '', competicion: '', pais: '', fecha_partido: '', hora: ''
-  })
+  const NUEVO_VACIO = {
+    local: '', visitante: '', competicion: '', pais: '', fecha_partido: '', hora: '',
+    arbitro: '', arb_amarillas: '', arb_rojas: '', prev_corners: '', prev_tarjetas: '',
+    pos_local: '', pos_visitante: '', fase: '', resultado_ida: '', bajas: '', notas: ''
+  }
+  const [nuevo, setNuevo] = useState(NUEVO_VACIO)
+  const [verDatos, setVerDatos] = useState(false)
+  /* Cuota de cada mercado, tecleada aquí y no en Sombra: después del partido
+     la casa deja de publicarla y se pierde para siempre. */
+  const [cuotasNuevo, setCuotasNuevo] = useState({})
   const [mercados, setMercados] = useState([])
 
   const alternarMercado = m =>
@@ -195,6 +202,12 @@ export default function Cola({ toast }) {
     const liga = nuevo.competicion.trim() || null
     const pais = nuevo.pais.trim() || paisPara(liga) || null
 
+    const limpio = v => (String(v ?? '').trim() || null)
+    const cuotas = Object.fromEntries(
+      mercados.map(m => [m, Number(cuotasNuevo[m])])
+              .filter(([, v]) => Number.isFinite(v) && v > 1)
+    )
+
     const { data, error } = await supabase.from('cola').insert({
       local: nuevo.local.trim(),
       visitante: nuevo.visitante.trim(),
@@ -202,18 +215,31 @@ export default function Cola({ toast }) {
       pais,
       fecha_partido: nuevo.fecha_partido || null,
       hora: nuevo.hora.trim() || null,
-      mercados
+      mercados,
+      cuotas: Object.keys(cuotas).length ? cuotas : null,
+      arbitro: limpio(nuevo.arbitro),
+      arb_amarillas: limpio(nuevo.arb_amarillas),
+      arb_rojas: limpio(nuevo.arb_rojas),
+      prev_corners: limpio(nuevo.prev_corners),
+      prev_tarjetas: limpio(nuevo.prev_tarjetas),
+      pos_local: limpio(nuevo.pos_local),
+      pos_visitante: limpio(nuevo.pos_visitante),
+      fase: limpio(nuevo.fase),
+      resultado_ida: limpio(nuevo.resultado_ida),
+      bajas: limpio(nuevo.bajas),
+      notas: limpio(nuevo.notas)
     }).select().single()
     if (error) return toast('No se pudo añadir: ' + error.message)
 
     if (liga) recordarCompeticion(liga, pais)
+    if (nuevo.arbitro?.trim()) recordarArbitro(nuevo.arbitro, nuevo.arb_amarillas, nuevo.arb_rojas)
     setItems(l => [data, ...l])
-    setNuevo({
-      local: '', visitante: '', competicion: nuevo.competicion,
-      pais: nuevo.pais, fecha_partido: '', hora: ''
-    })
+    // se conservan liga y país: la siguiente tanda suele ser de lo mismo
+    setNuevo({ ...NUEVO_VACIO, competicion: nuevo.competicion, pais: nuevo.pais })
+    setCuotasNuevo({})
     setMercados([])
     setVerMercados(false)
+    setVerDatos(false)
     setAnadiendo(false)
     toast('Añadido a la cola')
   }
@@ -389,7 +415,13 @@ export default function Cola({ toast }) {
       }))
 
     const filas = [
-      ...lista.map(m => ({ ...comun, mercado_ia: m.mercado, prob_ia: m.probabilidad })),
+      ...lista.map(m => ({
+        ...comun,
+        mercado_ia: m.mercado,
+        prob_ia: m.probabilidad,
+        // la cuota que anotaste al añadir el partido, si la pusiste
+        cuota_ia: Number(it.cuotas?.[m.mercado]) > 1 ? Number(it.cuotas[m.mercado]) : null
+      })),
       ...picks,
       ...alternativas
     ]
@@ -569,6 +601,75 @@ export default function Cola({ toast }) {
           </div>
         </div>
 
+        {/* Los datos del partido se piden AQUÍ, con el partido delante. Antes
+            había que añadirlo a la cola, buscarlo y abrirlo para rellenarlos,
+            y eso hacía que la mitad se quedara sin poner. */}
+        <div className="field">
+          <button className="extras-toggle" onClick={() => setVerDatos(v => !v)}>
+            {verDatos ? '− Cerrar datos' : '+ Datos del partido (Sofascore)'}
+          </button>
+
+          {verDatos && (
+            <div style={{ marginTop: 10 }}>
+              <div className="field">
+                <label htmlFor="n-arb">Árbitro</label>
+                <input id="n-arb" value={nuevo.arbitro} placeholder="Nombre del árbitro"
+                       onChange={e => setNuevo(n => ({ ...n, arbitro: e.target.value }))} />
+              </div>
+
+              {arbitros.length > 0 && (() => {
+                const q = (nuevo.arbitro || '').trim().toLowerCase()
+                const cerca = q ? arbitros.filter(a => a.nombre.toLowerCase().includes(q)) : arbitros
+                const muestra = cerca.slice(0, q ? 5 : 4)
+                if (!muestra.length) return null
+                return (
+                  <div style={{ marginTop: -4, marginBottom: 12 }}>
+                    <span className="eyebrow">{q ? 'Coincidencias' : 'Últimos usados'}</span>
+                    <div className="chips" style={{ marginTop: 6 }}>
+                      {muestra.map(a => (
+                        <button key={a.nombre}
+                                className={`chip ${nuevo.arbitro === a.nombre ? 'on' : ''}`}
+                                onClick={() => setNuevo(n => ({
+                                  ...n, arbitro: a.nombre,
+                                  arb_amarillas: a.amarillas ?? n.arb_amarillas,
+                                  arb_rojas: a.rojas ?? n.arb_rojas
+                                }))}>
+                          {a.nombre}{a.amarillas != null && ` · ${a.amarillas}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {[
+                [['arb_amarillas', 'Media amarillas', '5.48'], ['arb_rojas', 'Media rojas', '0.39']],
+                [['prev_corners', 'Córners previstos', '9'], ['prev_tarjetas', 'Tarjetas previstas', '4']],
+                [['pos_local', 'Posición local', '3º · 24 pts'], ['pos_visitante', 'Posición visitante', '11º · 14 pts']],
+                [['fase', 'Fase', 'ida / vuelta / único'], ['resultado_ida', 'Resultado de la ida', '2-0']]
+              ].map((par, i) => (
+                <div className="row c2" key={i}>
+                  {par.map(([k, etq, ph]) => (
+                    <div className="field" key={k}>
+                      <label htmlFor={`n-${k}`}>{etq}</label>
+                      <input id={`n-${k}`} value={nuevo[k]} placeholder={ph}
+                             onChange={e => setNuevo(n => ({ ...n, [k]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              {[['bajas', 'Bajas conocidas'], ['notas', 'Notas']].map(([k, etq]) => (
+                <div className="field" key={k}>
+                  <label htmlFor={`n-${k}`}>{etq}</label>
+                  <input id={`n-${k}`} value={nuevo[k]}
+                         onChange={e => setNuevo(n => ({ ...n, [k]: e.target.value }))} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="field">
           <button className="extras-toggle" onClick={() => setVerMercados(v => !v)}>
             {verMercados
@@ -585,6 +686,25 @@ export default function Cola({ toast }) {
                   {m} ×
                 </button>
               ))}
+            </div>
+          )}
+
+          {mercados.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <span className="eyebrow">Cuota de cada mercado</span>
+              {mercados.map(m => (
+                <div className="row c2" key={m} style={{ alignItems: 'center', marginTop: 6 }}>
+                  <div style={{ fontSize: 13, lineHeight: 1.3 }}>{m}</div>
+                  <input inputMode="decimal" placeholder="1.85"
+                         value={cuotasNuevo[m] ?? ''}
+                         onChange={e => setCuotasNuevo(c => ({ ...c, [m]: e.target.value }))} />
+                </div>
+              ))}
+              <p className="ayuda">
+                Apúntalas ahora. En cuanto empiece el partido la casa deja de publicarlas
+                y las de los mercados que no juegues se pierden: son justo las que hacen
+                falta para saber si el modelo elige mejor que tú.
+              </p>
             </div>
           )}
 
@@ -727,7 +847,7 @@ export default function Cola({ toast }) {
                               )}
                               {!!it.respuesta.picks_ia?.length && (
                                 <div className="sel">
-                                  <span className="eyebrow">Mercados IA</span>
+                                  <span className="eyebrow">Lo que ella habría elegido</span>
                                   {it.respuesta.picks_ia.map((g, k) => (
                                     <div className="sel-row" key={k}>
                                       <div className="sel-txt">
