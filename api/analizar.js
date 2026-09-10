@@ -13,6 +13,15 @@ goles totales, córners totales y tarjetas amarillas totales. Usa la forma de am
 equipos, su estilo, el árbitro si te lo dieron y lo que encuentres buscando. Esta
 estimación va en "linea_base" y NO puede depender del mercado que te pidieron.
 
+Y hazla ANTES de mirar las previsiones de Sofascore, si te las dieron. Solo después
+compáralas con tu número y di en "linea_base" si coincides o te separas, y por qué.
+Separarte está permitido y es lo valioso: si tú calculas 7 córners donde Sofascore
+dice 10, dilo y explica en qué te basas. Un análisis que siempre acaba en el número
+de Sofascore no es un segundo análisis, es el mismo repetido.
+IMPORTANTE: coincidir con Sofascore NO sube la confianza. Dos estimaciones que
+concuerdan solo valen doble si son independientes; si la tuya se apoyó en la suya,
+son una sola y creerlas más fiables por partida doble es un error.
+
 PASO 2 — Elige TUS propios mercados, antes de mirar los del usuario.
 Saca de tu línea base los 2 o 3 mercados de ESTE partido que mejor se sostengan
 con los datos que tienes. Van en "picks_ia". No mires todavía qué pidió el usuario
@@ -85,9 +94,13 @@ REGLAS:
 
 1. NO conoces las cuotas y no debes deducirlas. Estima desde el juego, no desde el precio.
 
-2. Los datos que aporta el usuario (árbitro y sus medias, posiciones, previsiones de
-   córners o tarjetas, resultado de la ida) son datos verificados: úsalos para construir
-   tu línea base. Pero su ELECCIÓN DE MERCADO no es un dato, es lo que estás evaluando.
+2. Los datos del usuario NO son todos iguales. Distingue dos clases:
+   (a) HECHOS: nombre del árbitro y sus medias reales, posiciones, resultado de la ida.
+       Son medidas de algo que ya pasó. Úsalos para construir tu línea base.
+   (b) PREVISIONES DE OTRO MODELO: los córners y tarjetas "esperados" de Sofascore son
+       la salida de un algoritmo, no una medición. Pueden estar equivocados, y de hecho
+       lo están a menudo en partidos atípicos. NO son tu línea base ni un hecho.
+   Y su ELECCIÓN DE MERCADO tampoco es un dato: es lo que estás evaluando.
 
 3. Busca en la web lo que falte y compruébalo RECIENTE: lesiones, sanciones, cambios de
    entrenador y probables alineaciones caducan rápido, y presentar información vieja como
@@ -229,8 +242,11 @@ export default async function handler(req, res) {
   if (fase) extras.push('Fase: ' + fase + (resultadoIda ? ' · resultado de la ida: ' + resultadoIda : ''))
   if (posLocal) extras.push('Posición del local en la tabla: ' + posLocal)
   if (posVisitante) extras.push('Posición del visitante en la tabla: ' + posVisitante)
-  if (prevCorners) extras.push('Córners esperados en el partido (previsión Sofascore): ' + prevCorners)
-  if (prevTarjetas) extras.push('Tarjetas amarillas esperadas en el partido (previsión Sofascore): ' + prevTarjetas)
+  /* Se etiquetan como lo que son: la salida de otro modelo, no una medición.
+     Con la etiqueta anterior ("previsión") el análisis acababa siempre en el
+     número de Sofascore y dejaba de ser una segunda opinión. */
+  if (prevCorners) extras.push('Córners que ESTIMA OTRO MODELO (Sofascore), no es un dato medido: ' + prevCorners)
+  if (prevTarjetas) extras.push('Tarjetas amarillas que ESTIMA OTRO MODELO (Sofascore), no es un dato medido: ' + prevTarjetas)
   if (bajas) extras.push('Bajas conocidas: ' + bajas)
   if (notas) extras.push('Notas del usuario: ' + notas)
 
