@@ -222,14 +222,18 @@ export default async function handler(req, res) {
     fase, resultadoIda,
     posLocal, posVisitante,
     prevCorners, prevTarjetas,
-    bajas, notas
+    bajas, notas, tope
   } = req.body || {}
+
+  /* Modo "dame tú los mercados": el usuario no propone ninguno y fija un
+     techo. Es un TECHO, no una cuota: pedir cinco fijos obligaría a rellenar
+     con lo que sea en un partido que solo da dos cosas buenas. */
+  const soloSuyos = !(mercados && mercados.length)
+  const techo = Math.min(Math.max(Number(tope) || 5, 1), 8)
 
   if (!partido) return res.status(400).json({ error: 'Falta el partido' })
 
-  const lista = (mercados && mercados.length ? mercados : [
-    '1X2 - gana el local', 'Más de 2.5 goles', 'Más de 1.5 goles', 'Ambos equipos marcan'
-  ]).join('\n- ')
+  const lista = soloSuyos ? '' : mercados.join('\n- ')
 
   // Solo se envían los datos que el usuario haya rellenado
   const extras = []
@@ -261,10 +265,24 @@ export default async function handler(req, res) {
     partes.push('- ' + extras.join('\n- '))
   }
   partes.push('')
-  partes.push('Primero estima el partido por tu cuenta (linea_base). Después evalúa si')
-  partes.push('estos mercados se sostienen, y corrige los que no. No los des por buenos')
-  partes.push('solo porque están en la lista:')
-  partes.push('- ' + lista)
+  if (soloSuyos) {
+    partes.push('El usuario NO pide mercados: los eliges tú. Estima el partido')
+    partes.push(`(linea_base) y devuelve en "picks_ia" HASTA ${techo} mercados, los que`)
+    partes.push('de verdad se sostengan con los datos.')
+    partes.push('')
+    partes.push(`${techo} es un TECHO, no una cuota que tengas que llenar. Devolver dos`)
+    partes.push('buenos es mejor que dos buenos y tres de relleno, y devolver cero es una')
+    partes.push('respuesta legítima. Si das menos del techo, explica en "datos" por qué no')
+    partes.push('hay más en este partido.')
+    partes.push('')
+    partes.push('Deja "mercados" y "sugerencias" como listas vacías: no hay nada que')
+    partes.push('evaluar ni que corregir.')
+  } else {
+    partes.push('Primero estima el partido por tu cuenta (linea_base). Después evalúa si')
+    partes.push('estos mercados se sostienen, y corrige los que no. No los des por buenos')
+    partes.push('solo porque están en la lista:')
+    partes.push('- ' + lista)
+  }
 
   const pregunta = partes.join('\n')
 
