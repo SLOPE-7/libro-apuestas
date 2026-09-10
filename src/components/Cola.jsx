@@ -77,6 +77,14 @@ export default function Cola({ toast }) {
   const [cuotasNuevo, setCuotasNuevo] = useState({})
   const [mercados, setMercados] = useState([])
 
+  const ponerCuotaNueva = (mercado, valor) =>
+    setCuotasNuevo(c => ({ ...c, [mercado]: valor }))
+
+  /* Cuál de los mercados elegidos pertenece a esta familia. Solo puede
+     haber uno por deslizador, así que el primero que coincida es el suyo. */
+  const mercadoActivo = (elegidos, unidad) =>
+    elegidos.find(m => m.endsWith(' ' + unidad)) || ''
+
   const alternarMercado = m =>
     setMercados(l => (l.includes(m) ? l.filter(x => x !== m) : [...l, m]))
 
@@ -690,35 +698,24 @@ export default function Cola({ toast }) {
             </div>
           )}
 
-          {mercados.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <span className="eyebrow">Cuota de cada mercado</span>
-              {mercados.map(m => (
-                <div className="row c2" key={m} style={{ alignItems: 'center', marginTop: 6 }}>
-                  <div style={{ fontSize: 13, lineHeight: 1.3 }}>{m}</div>
-                  <input inputMode="decimal" placeholder="1.85"
-                         value={cuotasNuevo[m] ?? ''}
-                         onChange={e => setCuotasNuevo(c => ({ ...c, [m]: e.target.value }))} />
-                </div>
-              ))}
-              <p className="ayuda">
-                Apúntalas ahora. En cuanto empiece el partido la casa deja de publicarlas
-                y las de los mercados que no juegues se pierden: son justo las que hacen
-                falta para saber si el modelo elige mejor que tú.
-              </p>
-            </div>
-          )}
+
 
           {verMercados && (<>
           <LineaMercado titulo="Goles" unidad="goles"
                         lineasMas={L_GOLES} lineasMenos={L_GOLES}
-                        puestos={mercados} onAlternar={alternarMercado} />
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'goles')]}
+                        onCuota={ponerCuotaNueva} />
           <LineaMercado titulo="Córners" unidad="córners"
                         lineasMas={L_CORNERS_MAS} lineasMenos={L_CORNERS_MENOS}
-                        puestos={mercados} onAlternar={alternarMercado} />
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'córners')]}
+                        onCuota={ponerCuotaNueva} />
           <LineaMercado titulo="Tarjetas" unidad="tarjetas"
                         lineasMas={L_TARJ_MAS} lineasMenos={L_TARJ_MENOS}
-                        puestos={mercados} onAlternar={alternarMercado} />
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'tarjetas')]}
+                        onCuota={ponerCuotaNueva} />
           <span className="eyebrow" style={{ display: 'block', margin: '14px 0 7px' }}>
             Resultado y otros
           </span>
@@ -728,6 +725,22 @@ export default function Cola({ toast }) {
                       onClick={() => alternarMercado(m)}>{m}</button>
             ))}
           </div>
+
+          {/* Estos no tienen deslizador donde meter la cuota, así que van
+              aquí debajo, solo los que hayas marcado. */}
+          {mercados.filter(m => DISCRETOS.includes(m)).length > 0 && (
+            <div className="cuotas-discretos">
+              <span className="eyebrow">Cuota de estos mercados</span>
+              {mercados.filter(m => DISCRETOS.includes(m)).map(m => (
+                <div className="cuota-linea" key={m}>
+                  <span>{m}</span>
+                  <input inputMode="decimal" placeholder="1.85"
+                         value={cuotasNuevo[m] ?? ''}
+                         onChange={e => ponerCuotaNueva(m, e.target.value)} />
+                </div>
+              ))}
+            </div>
+          )}
 
           {mercados.length > 0 ? (
             <div className="elegidos">
