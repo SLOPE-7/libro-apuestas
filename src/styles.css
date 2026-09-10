@@ -1028,3 +1028,44 @@ button:active{transform:scale(.975)}
 }
 .pick-margen.pos{color:var(--gain)}
 .pick-margen.neg{color:var(--loss)}
+
+
+/* ── Varianza ──────────────────────────────────────────────────────
+   Plegado a propósito: es contexto para cuando dudas, no un panel que
+   mirar antes de cada apuesta. Y la tanda que enseña es siempre la
+   misma para ese mercado, para que no invite a repetir la tirada. */
+.varianza{margin-top:11px;border-top:1px solid var(--rule);padding-top:9px}
+.varianza-cab{
+  display:flex;width:100%;align-items:center;justify-content:space-between;
+  background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink-soft);
+  font:500 11.5px/1 "IBM Plex Sans Condensed",sans-serif;letter-spacing:.04em;
+}
+.varianza-cuerpo{padding-top:11px}
+
+.tanda{display:flex;gap:3px;margin-bottom:11px}
+.marca{flex:1;height:22px;border-radius:2px}
+.marca.ok{background:var(--gain-soft);border-bottom:2px solid var(--gain)}
+.marca.no{background:var(--loss-soft);border-bottom:2px solid var(--loss)}
+
+.varianza-txt{font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.varianza-txt b{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  color:var(--ink);
+}
+.varianza-cifras{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:var(--r);
+  margin:11px 0;overflow:hidden;
+}
+.varianza-cifras > div{background:var(--card);padding:9px 11px}
+.varianza-cifras .k{
+  display:block;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.varianza-cifras .v{
+  display:block;margin-top:3px;
+  font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;
+  font-variant-numeric:tabular-nums;
+}
