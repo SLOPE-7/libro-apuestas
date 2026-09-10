@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Escudo, Bandera } from './Escudo'
 import { supabase } from '../lib/supabase'
 import AutoInput from './AutoInput'
 import LineaMercado from './LineaMercado'
@@ -455,7 +456,7 @@ export default function Cola({ toast }) {
       const clave = it.competicion
         ? it.competicion + (it.pais ? ` · ${it.pais}` : '')
         : 'Sin competición'
-      if (!acc[clave]) acc[clave] = { clave, items: [] }
+      if (!acc[clave]) acc[clave] = { clave, pais: it.pais, items: [] }
       acc[clave].items.push(it)
       return acc
     }, {})
@@ -780,7 +781,7 @@ export default function Cola({ toast }) {
               <div key={g.clave}>
                 <button className="grupo-cab"
                         onClick={() => setGruposAbiertos(x => ({ ...x, [g.clave]: !ga }))}>
-                  <span className="grupo-tit">{g.clave}</span>
+                  <span className="grupo-tit"><Bandera pais={g.pais} /> {g.clave}</span>
                   <span className="grupo-datos">
                     <span className="contador">{g.items.length}</span>
                     <span className="chevron">{ga ? '−' : '+'}</span>
@@ -805,7 +806,11 @@ export default function Cola({ toast }) {
                         </button>
                         <button className="cola-cab" onClick={() => setAbierto(ab ? null : it.id)}>
                           <div>
-                            <div className="cola-nom">{it.local} vs {it.visitante}</div>
+                            <div className="cola-nom">
+                              <Escudo equipo={it.local} /> {it.local}
+                              <span className="vs-mini">vs</span>
+                              <Escudo equipo={it.visitante} /> {it.visitante}
+                            </div>
                             <div className="cola-meta">
                               {it.hora || 'sin hora'}
                               {yaEmpezo && ' · YA EMPEZÓ'}
