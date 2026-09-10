@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from 'recharts'
 import { diagnostico } from '../lib/calc'
 import { proximos, cuandoEmpieza } from '../lib/proximos'
+import { Escudo } from './Escudo'
 
 const money = v => (v < 0 ? '-' : '') + 'L' + Math.abs(v).toFixed(2)
 const pct = v => (v === null || v === undefined ? '—' : (v * 100).toFixed(1) + '%')
@@ -72,7 +73,9 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
                     {h.items.map(it => (
                       <button className="prox-item" key={it.selId}
                               onClick={() => onAbrir?.(it.apuestaId)}>
-                        <span className="prox-part">{it.partido}</span>
+                        <span className="prox-part">
+                          <Escudo equipo={it.partido} /> {it.partido}
+                        </span>
                         {it.mercado && <span className="prox-merc">{it.mercado}</span>}
                       </button>
                     ))}
