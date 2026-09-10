@@ -123,6 +123,48 @@ export function resultado(apuesta) {
 }
 
 /**
+ * EXPOSICIÓN REPETIDA.
+ *
+ * Cuando el mismo mercado del mismo partido está en varios boletos vivos, esos
+ * boletos dejan de ser apuestas independientes: un solo resultado los tumba a
+ * todos a la vez. Es la forma más común de perder mucho más de lo que uno cree
+ * que arriesga, porque cada boleto se firmó por separado.
+ *
+ * Devuelve solo lo que se repite, ordenado por dinero en juego.
+ */
+export function exposicion(apuestas = []) {
+  const mapa = {}
+
+  for (const a of apuestas) {
+    if (estadoApuesta(a) !== 'pendiente') continue
+    const stake = Number(a.stake) || 0
+    // un mismo mercado repetido dentro de UN boleto no multiplica el riesgo
+    const vistos = new Set()
+
+    for (const s of a.selecciones || []) {
+      if (estadoSeleccion(s) !== 'pendiente') continue
+      const subs = Array.isArray(s.mercados) && s.mercados.length
+        ? s.mercados.filter(m => !m.e || m.e === 'pendiente').map(m => m.t)
+        : [s.mercado]
+
+      for (const t of subs) {
+        if (!t) continue
+        const clave = `${s.partido || '—'} · ${t}`
+        if (vistos.has(clave)) continue
+        vistos.add(clave)
+        if (!mapa[clave]) mapa[clave] = { partido: s.partido, mercado: t, boletos: 0, stake: 0 }
+        mapa[clave].boletos++
+        mapa[clave].stake += stake
+      }
+    }
+  }
+
+  return Object.values(mapa)
+    .filter(x => x.boletos > 1)
+    .sort((a, b) => b.stake - a.stake || b.boletos - a.boletos)
+}
+
+/**
  * Valor razonable de un cierre anticipado.
  * Si las patas que faltan estuvieran a precio justo, la apuesta vale hoy
  * lo apostado multiplicado por las cuotas ya acertadas. La casa siempre
