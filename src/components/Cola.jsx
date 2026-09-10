@@ -10,6 +10,7 @@ import {
   DISCRETOS, L_GOLES, L_CORNERS_MAS, L_CORNERS_MENOS, L_TARJ_MAS, L_TARJ_MENOS
 } from '../lib/mercados'
 import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
+import { cuotaMinima, margenSobreCuota } from '../lib/calc'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
@@ -72,6 +73,9 @@ export default function Cola({ toast }) {
   }
   const [nuevo, setNuevo] = useState(NUEVO_VACIO)
   const [verDatos, setVerDatos] = useState(false)
+  /* 'yo' = eliges los mercados · 'ella' = los propone el modelo hasta un techo */
+  const [quienElige, setQuienElige] = useState('ella')
+  const [tope, setTope] = useState(5)
   /* Cuota de cada mercado, tecleada aquí y no en Sombra: después del partido
      la casa deja de publicarla y se pierde para siempre. */
   const [cuotasNuevo, setCuotasNuevo] = useState({})
@@ -224,7 +228,8 @@ export default function Cola({ toast }) {
       pais,
       fecha_partido: nuevo.fecha_partido || null,
       hora: nuevo.hora.trim() || null,
-      mercados,
+      mercados: quienElige === 'ella' ? [] : mercados,
+      tope: quienElige === 'ella' ? tope : null,
       cuotas: Object.keys(cuotas).length ? cuotas : null,
       arbitro: limpio(nuevo.arbitro),
       arb_amarillas: limpio(nuevo.arb_amarillas),
@@ -345,6 +350,7 @@ export default function Cola({ toast }) {
             pais: it.pais || '',
             fecha: it.fecha_partido || '',
             mercados: it.mercados || [],
+            tope: it.tope || null,
             arbitro: it.arbitro || '',
             arbAmarillas: it.arb_amarillas || '',
             arbRojas: it.arb_rojas || '',
@@ -608,6 +614,31 @@ export default function Cola({ toast }) {
                    onChange={e => setNuevo(n => ({ ...n, hora: e.target.value }))}
                    placeholder="13:00" />
           </div>
+        </div>
+
+        <div className="field">
+          <label>¿Quién elige los mercados?</label>
+          <div className="segmented" style={{ marginBottom: 0 }}>
+            <button className={quienElige === 'ella' ? 'on' : ''}
+                    onClick={() => setQuienElige('ella')}>Los elige ella</button>
+            <button className={quienElige === 'yo' ? 'on' : ''}
+                    onClick={() => setQuienElige('yo')}>Los elijo yo</button>
+          </div>
+          {quienElige === 'ella' && (
+            <div className="tope-caja">
+              <span className="tope-txt">Como máximo</span>
+              <div className="tope-nums">
+                {[2, 3, 4, 5, 6].map(t => (
+                  <button key={t} className={`chip ${tope === t ? 'on' : ''}`}
+                          onClick={() => setTope(t)}>{t}</button>
+                ))}
+              </div>
+              <p className="ayuda" style={{ marginTop: 8 }}>
+                Es un techo, no un pedido. Si el partido solo da dos mercados que se
+                sostengan, va a devolver dos y explicar por qué no hay más.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Los datos del partido se piden AQUÍ, con el partido delante. Antes
