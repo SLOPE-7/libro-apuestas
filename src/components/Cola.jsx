@@ -11,6 +11,7 @@ import {
 } from '../lib/mercados'
 import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 import { cuotaMinima, margenSobreCuota } from '../lib/calc'
+import Varianza from './Varianza'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
@@ -383,6 +384,17 @@ export default function Cola({ toast }) {
     toast('Análisis terminado')
   }
 
+  /** Cuota tecleada sobre un pick. Se guarda en la cola para que viaje
+   *  sola a Sombra al guardar el análisis. */
+  async function guardarCuotaPick(it, mercado, valor) {
+    const cuotas = { ...(it.cuotas || {}), [mercado]: valor }
+    setItems(l => l.map(x => (x.id === it.id ? { ...x, cuotas } : x)))
+    const limpias = Object.fromEntries(
+      Object.entries(cuotas).map(([k, v]) => [k, Number(v)]).filter(([, v]) => v > 1))
+    await supabase.from('cola')
+      .update({ cuotas: Object.keys(limpias).length ? limpias : null }).eq('id', it.id)
+  }
+
   async function guardarEnSombra(it) {
     /* Sin este cerrojo, dos toques guardaban el análisis entero dos veces y
        en Sombra aparecían mercados repetidos que parecían un fallo del modelo. */
@@ -417,6 +429,7 @@ export default function Cola({ toast }) {
         ...comun,
         mercado_ia: g.mercado,
         prob_ia: g.probabilidad ?? null,
+        cuota_ia: Number(it.cuotas?.[g.mercado]) > 1 ? Number(it.cuotas[g.mercado]) : null,
         veredicto: 'pick propio de la IA'
       }))
 
@@ -710,7 +723,7 @@ export default function Cola({ toast }) {
           )}
         </div>
 
-        <div className="field">
+        <div className="field" hidden={quienElige === 'ella'}>
           <button className="extras-toggle" onClick={() => setVerMercados(v => !v)}>
             {verMercados
               ? '− Cerrar mercados'
@@ -895,19 +908,45 @@ export default function Cola({ toast }) {
                                 </div>
                               )}
                               {!!it.respuesta.picks_ia?.length && (
-                                <div className="sel">
-                                  <span className="eyebrow">Lo que ella habría elegido</span>
-                                  {it.respuesta.picks_ia.map((g, k) => (
-                                    <div className="sel-row" key={k}>
-                                      <div className="sel-txt">
-                                        <b>{g.mercado}</b>
-                                        {g.porque && <em>{g.porque}</em>}
+                                <div className="picks">
+                                  <span className="eyebrow">
+                                    {it.tope ? 'Los mercados que eligió' : 'Lo que ella habría elegido'}
+                                  </span>
+                                  {it.respuesta.picks_ia.map((g, k) => {
+                                    const min = cuotaMinima(g.probabilidad)
+                                    const real = Number(it.cuotas?.[g.mercado])
+                                    const m = margenSobreCuota(g.probabilidad, real)
+                                    return (
+                                      <div className="pick" key={k}>
+                                        <div className="pick-top">
+                                          <b>{g.mercado}</b>
+                                          <span className="pick-prob">{pct(g.probabilidad)}</span>
+                                        </div>
+                                        {g.porque && <p className="pick-razon">{g.porque}</p>}
+                                        <div className="pick-cuotas">
+                                          <span className="pick-min">
+                                            Necesitas <b>{min ? min.toFixed(2) : '—'}</b>
+                                          </span>
+                                          <input inputMode="decimal" placeholder="cuota"
+                                                 value={it.cuotas?.[g.mercado] ?? ''}
+                                                 onChange={e => guardarCuotaPick(it, g.mercado, e.target.value)} />
+                                          {m != null && (
+                                            <span className={`pick-margen ${m > 0 ? 'pos' : 'neg'}`}>
+                                              {m > 0 ? '+' : ''}{(m * 100).toFixed(1)}%
+                                            </span>
+                                          )}
+                                        </div>
+                                        {m != null && (
+                                          <Varianza mercado={g.mercado}
+                                                    prob={g.probabilidad} cuota={real} />
+                                        )}
                                       </div>
-                                      <span className="odd">
-                                        {g.probabilidad == null ? '—' : pct(g.probabilidad)}
-                                      </span>
-                                    </div>
-                                  ))}
+                                    )
+                                  })}
+                                  <p className="ayuda">
+                                    «Necesitas» es la cuota mínima para no perder dinero con esa
+                                    probabilidad. Por debajo pierdes aunque aciertes casi siempre.
+                                  </p>
                                 </div>
                               )}
                               {it.respuesta.datos && (
