@@ -888,14 +888,15 @@ export default function Cola({ toast }) {
 
                       {ab && (
                         <div className="cola-cuerpo">
-                          {!susMercados.length && (
+                          {!susMercados.length && !it.tope && (
                             <div className="flag">
                               <strong>Sin mercados.</strong> Elige abajo qué quieres que
                               estime antes de mandarlo a analizar.
                             </div>
                           )}
 
-                          {it.respuesta?.mercados?.length > 0 && (
+                          {(it.respuesta?.mercados?.length > 0 ||
+                            it.respuesta?.picks_ia?.length > 0) && (
                             <>
                               {/* Lo que el modelo esperaba del partido antes de
                                   mirar tus mercados. Si tu línea está lejos de
@@ -958,7 +959,7 @@ export default function Cola({ toast }) {
                               {it.respuesta.datos && (
                                 <p className="razonamiento">{it.respuesta.datos}</p>
                               )}
-                              {it.respuesta.mercados.map((m, i) => (
+                              {(it.respuesta.mercados || []).map((m, i) => (
                                 <div className="sel" key={i}>
                                   <div className="sel-row">
                                     <div className="sel-txt">
