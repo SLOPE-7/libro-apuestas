@@ -4,7 +4,10 @@ import { useState } from 'react'
  * Selector de línea al estilo de una casa de apuestas.
  * Eliges lado (Más / Menos) y deslizas hasta la línea que te interesa.
  */
-export default function LineaMercado({ titulo, unidad, lineasMas, lineasMenos, puestos, onAlternar }) {
+export default function LineaMercado({
+  titulo, unidad, lineasMas, lineasMenos, puestos, onAlternar,
+  cuota, onCuota
+}) {
   const [lado, setLado] = useState('Más')
   const [i, setI] = useState(0)
 
@@ -54,6 +57,17 @@ export default function LineaMercado({ titulo, unidad, lineasMas, lineasMenos, p
       <button className={`linea-add ${activo ? 'on' : ''}`} onClick={() => onAlternar(texto)}>
         {activo ? '✓ Añadido · tocar para quitar' : '+ Añadir este mercado'}
       </button>
+
+      {/* La cuota se pide aquí, con la línea delante. Estaba en una lista
+          aparte más arriba y había que acordarse de a qué mercado
+          correspondía cada casilla. */}
+      {activo && onCuota && (
+        <div className="linea-cuota">
+          <label htmlFor={`lc-${unidad}`}>Cuota</label>
+          <input id={`lc-${unidad}`} inputMode="decimal" placeholder="1.85"
+                 value={cuota ?? ''} onChange={e => onCuota(texto, e.target.value)} />
+        </div>
+      )}
     </div>
   )
 }
