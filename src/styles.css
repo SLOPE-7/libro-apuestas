@@ -1020,3 +1020,112 @@ button.act.act-riesgo:hover { filter: brightness(1.08); }
 }
 .prox-chip em { font-style: normal; font-size: 11px; opacity: .5; }
 .prox-chip.on { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.3); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CAPA VISUAL — se pega al FINAL de src/styles.css
+
+   La identidad no cambia: sigue siendo un libro contable. Lo que cambia
+   es que ahora el papel es de verdad (los libros de contabilidad tienen
+   rayas azul verdosas y margen rojo, no grises) y que la interfaz
+   responde cuando la tocas.
+
+   Todo el movimiento contesta a una acción tuya. No hay nada que se
+   mueva solo salvo la curva de la banca al abrir Resumen, y no hay
+   ninguna celebración al ganar: una app que festeja los aciertos y
+   calla las pérdidas te enseña a apostar más.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root{
+  --regla-azul:  rgba(74,116,140,.20);   /* raya de libro mayor */
+  --margen-rojo: rgba(151,51,31,.28);
+  --tinta-azul:  #2E5A72;                /* activo e interactivo */
+}
+
+/* ── El papel ──────────────────────────────────────────────────────
+   Rayas azul verdosas en vez de grises, y una línea de margen roja
+   a la izquierda: así es una hoja de libro mayor real. */
+body{
+  background-image:
+    linear-gradient(to right, transparent 0 21px, var(--margen-rojo) 21px 22px, transparent 22px),
+    repeating-linear-gradient(to bottom, transparent 0 33px, var(--regla-azul) 33px 34px);
+}
+@media (max-width:420px){
+  /* en pantallas estrechas el margen se come el texto */
+  body{background-image:repeating-linear-gradient(
+    to bottom, transparent 0 33px, var(--regla-azul) 33px 34px)}
+}
+
+/* ── Pestañas: el subrayado crece desde el centro ──────────────── */
+nav button{position:relative;border-bottom-color:transparent!important}
+nav button::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:var(--tinta-azul);
+  transform:scaleX(0);transform-origin:center;
+  transition:transform .28s cubic-bezier(.4,0,.2,1);
+}
+nav button[aria-selected=true]{color:var(--tinta-azul)}
+nav button[aria-selected=true]::after{transform:scaleX(1)}
+
+/* ── Abrir una apuesta o un panel ──────────────────────────────── */
+@keyframes abrir{
+  from{opacity:0;transform:translateY(-6px);clip-path:inset(0 0 100% 0)}
+  to  {opacity:1;transform:none;         clip-path:inset(0 0 0 0)}
+}
+.bet-cuerpo,.cola-cuerpo{animation:abrir .26s cubic-bezier(.2,.7,.3,1)}
+
+.chevron{
+  display:inline-block;
+  transition:transform .24s cubic-bezier(.4,0,.2,1),color .18s;
+}
+.bet.abierta .chevron,[aria-expanded=true] .chevron{
+  transform:rotate(180deg);color:var(--tinta-azul);
+}
+
+/* ── Respuesta al dedo ─────────────────────────────────────────── */
+button{transition:transform .09s ease, background .14s, color .14s, border-color .14s}
+button:active{transform:scale(.975)}
+.chip:active,.sub-btn:active,.tiny:active,.mini:active{transform:scale(.94)}
+.bet-cabecera:active,.cola-cab:active,.grupo-cab:active{background:var(--card-2)}
+
+/* ── Marcar un resultado ────────────────────────────────────────
+   Mismo destello para acierto y para fallo, solo cambia el color:
+   si el verde brillara más que el rojo, la app estaría premiando. */
+@keyframes marcado{
+  0%{background:transparent} 30%{background:var(--eco)} 100%{background:transparent}
+}
+.sub-btn.win.on,.tiny.win.on{--eco:var(--gain-soft);animation:marcado .5s ease-out}
+.sub-btn.lose.on,.tiny.lose.on{--eco:var(--loss-soft);animation:marcado .5s ease-out}
+
+/* ── Estado de cada asiento: el canto lo dice de un vistazo ────── */
+.bet{transition:border-left-color .2s, background .2s}
+.bet.ganada  {border-left-width:4px}
+.bet.perdida {border-left-width:4px}
+.bet.cerrada {border-left-width:4px}
+.bet.pendiente{border-left-width:4px;border-left-color:var(--tinta-azul)}
+
+/* ── Lo que está en juego ahora mismo respira ──────────────────── */
+@keyframes latido{0%,100%{opacity:1}50%{opacity:.45}}
+.prox-hora.vivo .prox-reloj em{animation:latido 2.4s ease-in-out infinite}
+
+/* ── Avisos: entran deslizando, no aparecen de golpe ───────────── */
+@keyframes entrar{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.flag,.verdict,.cierre-info{animation:entrar .3s cubic-bezier(.2,.7,.3,1)}
+
+.toast{animation:entrar .26s cubic-bezier(.2,.7,.3,1)}
+
+/* ── Cifras: la banca manda ────────────────────────────────────── */
+.figs-alta .fig .v{transition:color .2s}
+.fig .v.pos{color:var(--gain)}
+.fig .v.neg{color:var(--loss)}
+
+/* ── Foco visible con el color de la casa ──────────────────────── */
+:focus-visible{outline:2px solid var(--tinta-azul);outline-offset:2px}
+
+/* Quien pida menos movimiento no ve nada de esto. La regla de arriba
+   en styles.css ya lo apaga con !important; esto es por si acaso. */
+@media (prefers-reduced-motion:reduce){
+  *,*::after,*::before{animation:none!important;transition:none!important}
+  nav button[aria-selected=true]::after{transform:scaleX(1)}
+}
+
