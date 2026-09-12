@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import {
   cuotaApuesta, cuotaTotal, estadoApuesta, estadoSeleccion,
   resultado, valorCierre, tieneAnuladaParcial, patasApuesta, exposicion,
-  pendientesPorMercado} from '../lib/calc'
+  pendientesPorMercado, pendientesPorPartido} from '../lib/calc'
 import { Escudo } from './Escudo'
 
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v).toFixed(2)
@@ -35,7 +35,13 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
   const [confirmarPerdida, setConfirmarPerdida] = useState(null)
   const [verExpo, setVerExpo] = useState(false)
   const [verPend, setVerPend] = useState(false)
+  const [buscar, setBuscar] = useState('')
+  const [partidoAbierto, setPartidoAbierto] = useState(null)
   const porMarcar = pendientesPorMercado(apuestas)
+  const q = buscar.trim().toLowerCase()
+  const porPartido = pendientesPorPartido(apuestas).filter(p =>
+    !q || p.partido.toLowerCase().includes(q) ||
+    p.mercados.some(m => (m.mercado || '').toLowerCase().includes(q)))
   const expo = exposicion(apuestas)
   const expoTotal = expo.reduce((t, x) => t + x.stake, 0)
 
@@ -481,25 +487,55 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
                 boletos que lo lleven: se juega una vez, así que su resultado es el
                 mismo en todos.
               </p>
-              {porMarcar.map(g => (
-                <div className="pend" key={g.clave}>
-                  <div className="pend-txt">
-                    <b>{g.partido}</b>
-                    <em>{g.mercado}</em>
+              <input className="buscador" value={buscar} type="search"
+                     placeholder="Buscar partido o mercado…"
+                     onChange={e => setBuscar(e.target.value)} />
+
+              {porPartido.length === 0 && (
+                <p className="ayuda">Ningún partido coincide con «{buscar}».</p>
+              )}
+
+              {porPartido.map(p => {
+                /* Buscando se abren solos: si escribiste el nombre, es que
+                   quieres verlo, no volver a tocarlo. */
+                const ab = q ? true : partidoAbierto === p.partido
+                return (
+                  <div className="pend-partido" key={p.partido}>
+                    <button className="pend-cab"
+                            onClick={() => setPartidoAbierto(ab ? null : p.partido)}
+                            aria-expanded={ab}>
+                      <span className="pend-cab-txt">
+                        <b>{p.partido}</b>
+                        <em>
+                          {p.hora ? p.hora + ' · ' : ''}
+                          {p.mercados.length} {p.mercados.length === 1 ? 'mercado' : 'mercados'}
+                          {p.boletos > 1 ? ` · ${p.boletos} boletos` : ''}
+                        </em>
+                      </span>
+                      <span className="chevron">{ab ? '−' : '+'}</span>
+                    </button>
+
+                    {ab && p.mercados.map(g => (
+                      <div className="pend" key={g.clave}>
+                        <div className="pend-txt">
+                          <em>{g.mercado}</em>
+                        </div>
+                        <div className="pend-der">
+                          {g.boletos > 1 && (
+                            <span className="pend-n">{g.boletos}×</span>
+                          )}
+                          <button className="sub-btn win" title="Acertó"
+                                  onClick={() => marcarEnTodos(g, 'ganada')}>✓</button>
+                          <button className="sub-btn lose" title="Falló"
+                                  onClick={() => marcarEnTodos(g, 'perdida')}>✗</button>
+                          <button className="sub-btn void" title="Anulado"
+                                  onClick={() => marcarEnTodos(g, 'anulada')}>∅</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="pend-der">
-                    {g.boletos > 1 && (
-                      <span className="pend-n">{g.boletos} boletos</span>
-                    )}
-                    <button className="sub-btn win" title="Acertó"
-                            onClick={() => marcarEnTodos(g, 'ganada')}>✓</button>
-                    <button className="sub-btn lose" title="Falló"
-                            onClick={() => marcarEnTodos(g, 'perdida')}>✗</button>
-                    <button className="sub-btn void" title="Anulado"
-                            onClick={() => marcarEnTodos(g, 'anulada')}>∅</button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </>
