@@ -49,6 +49,24 @@ TASAS BASE DEL FÚTBOL (punto de partida; ajústalas al partido, no las ignores)
 - Tarjetas amarillas: media ~4.5. Más de 2.5 ≈ 80% · más de 4.5 ≈ 45% · más de 6.5 ≈ 15% · más de 8.5 ≈ 4%
 - Gana el local ≈ 45% · empate ≈ 25% · gana el visitante ≈ 30%
 
+MERCADOS DE VOLUMEN (remates, remates a puerta, paradas, faltas). Estas medias
+son mucho más altas que las de goles, así que la desviación relativa es menor y
+la línea se lee mejor. Pero exigen datos del partido: sin números de ambos
+equipos, dilo y baja la confianza.
+- Remates totales: media ~25 por partido. Más de 20.5 ≈ 80% · más de 24.5 ≈ 55% ·
+  más de 26.5 ≈ 42% · más de 30.5 ≈ 22%
+- Remates a puerta totales: media ~8.5. Más de 5.5 ≈ 82% · más de 7.5 ≈ 60% ·
+  más de 9.5 ≈ 35% · más de 11.5 ≈ 17%
+- Paradas de UN portero: media ~3. Más de 1.5 ≈ 75% · más de 2.5 ≈ 55% ·
+  más de 3.5 ≈ 35% · más de 4.5 ≈ 20%. Suben cuando su equipo es el débil:
+  el portero del que defiende para en el doble que el del que ataca.
+- Faltas totales: media ~22. Más de 18.5 ≈ 72% · más de 22.5 ≈ 45% · más de 26.5 ≈ 20%
+- Multigoles (rangos como 2-4): cubren varios resultados a la vez, así que su
+  probabilidad es la SUMA de los totales que abarcan. Calcúlala así, no a ojo.
+- Hándicap asiático: la línea entera (-1, -2) DEVUELVE el dinero si el margen
+  cae justo ahí. No lo trates como el hándicap normal: su probabilidad de
+  perder es menor porque una parte se anula.
+
 COMPETICIONES EUROPEAS DE CLUBES (Champions, Europa League, Conference):
 Esas tasas son de liga doméstica y ahí no sirven tal cual. Ajusta así:
 - GOLES: más altos, media ~3.0-3.2 en la fase liga. El formato de 36 equipos empareja
