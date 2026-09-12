@@ -172,7 +172,8 @@ export function pendientesPorMercado(apuestas = []) {
         if (sub.estado !== 'pendiente') continue
         const clave = `${s.partido || '—'}||${sub.texto || '—'}`
         if (!mapa[clave]) mapa[clave] = {
-          clave, partido: s.partido, mercado: sub.texto, sitios: []
+          clave, partido: s.partido, mercado: sub.texto, sitios: [],
+          fecha: s.fecha_partido || null, hora: s.hora || null
         }
         mapa[clave].sitios.push({ apuestaId: a.id, selId: s.id, indice: sub.i, stake: Number(a.stake) || 0 })
       }
@@ -187,6 +188,35 @@ export function pendientesPorMercado(apuestas = []) {
         .reduce((t, v) => t + v, 0)
     }))
     .sort((a, b) => b.boletos - a.boletos || b.enJuego - a.enJuego)
+}
+
+/**
+ * Lo mismo, pero agrupado por PARTIDO. Con sesenta mercados sueltos la
+ * lista es inservible: un partido se ve una vez y dentro están sus
+ * mercados, que es como lo vives al mirar el resultado.
+ *
+ * Ordena por hora de inicio cuando se sabe: lo que ya se jugó primero,
+ * que es lo que estás intentando marcar.
+ */
+export function pendientesPorPartido(apuestas = []) {
+  const partidos = {}
+
+  for (const g of pendientesPorMercado(apuestas)) {
+    const k = g.partido || '—'
+    if (!partidos[k]) partidos[k] = {
+      partido: k, mercados: [], boletos: new Set(),
+      fecha: g.fecha, hora: g.hora
+    }
+    partidos[k].mercados.push(g)
+    for (const x of g.sitios) partidos[k].boletos.add(x.apuestaId)
+    if (!partidos[k].fecha && g.fecha) { partidos[k].fecha = g.fecha; partidos[k].hora = g.hora }
+  }
+
+  const orden = p => (p.fecha ? `${p.fecha} ${p.hora || '99:99'}` : '9999')
+
+  return Object.values(partidos)
+    .map(p => ({ ...p, boletos: p.boletos.size }))
+    .sort((a, b) => orden(a).localeCompare(orden(b)) || b.boletos - a.boletos)
 }
 
 /**
