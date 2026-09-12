@@ -8,6 +8,8 @@ export default function LineaMercado({
   titulo, unidad, lineasMas, lineasMenos, puestos, onAlternar,
   cuota, onCuota
 }) {
+  // "remates a puerta" llevaría espacios al id, que no son válidos en HTML
+  const idCuota = 'lc-' + String(unidad).replace(/\s+/g, '-')
   const [lado, setLado] = useState('Más')
   const [i, setI] = useState(0)
 
@@ -63,8 +65,8 @@ export default function LineaMercado({
           correspondía cada casilla. */}
       {activo && onCuota && (
         <div className="linea-cuota">
-          <label htmlFor={`lc-${unidad}`}>Cuota</label>
-          <input id={`lc-${unidad}`} inputMode="decimal" placeholder="1.85"
+          <label htmlFor={idCuota}>Cuota</label>
+          <input id={idCuota} inputMode="decimal" placeholder="1.85"
                  value={cuota ?? ''} onChange={e => onCuota(texto, e.target.value)} />
         </div>
       )}
