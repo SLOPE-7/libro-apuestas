@@ -7,7 +7,9 @@ import CampoLento from './CampoLento'
 import { parseCola } from '../lib/parseCola'
 import { paisDe, PAISES } from '../lib/paises'
 import {
-  DISCRETOS, L_GOLES, L_CORNERS_MAS, L_CORNERS_MENOS, L_TARJ_MAS, L_TARJ_MENOS
+  DISCRETOS, L_GOLES, L_CORNERS_MAS, L_CORNERS_MENOS, L_TARJ_MAS, L_TARJ_MENOS,
+  L_REMATES_MAS, L_REMATES_MENOS, L_PUERTA_MAS, L_PUERTA_MENOS,
+  L_PARADAS_MAS, L_PARADAS_MENOS, L_FALTAS_MAS, L_FALTAS_MENOS
 } from '../lib/mercados'
 import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 import { cuotaMinima, margenSobreCuota } from '../lib/calc'
@@ -766,6 +768,30 @@ export default function Cola({ toast }) {
                         lineasMas={L_TARJ_MAS} lineasMenos={L_TARJ_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'tarjetas')]}
+                        onCuota={ponerCuotaNueva} />
+
+          {/* Mercados de volumen. La casa los ajusta menos porque los juega
+              menos gente, pero exigen estadística concreta: sin números de
+              los dos equipos, una estimación aquí es un número inventado. */}
+          <LineaMercado titulo="Remates totales" unidad="remates"
+                        lineasMas={L_REMATES_MAS} lineasMenos={L_REMATES_MENOS}
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'remates')]}
+                        onCuota={ponerCuotaNueva} />
+          <LineaMercado titulo="Remates a puerta" unidad="remates a puerta"
+                        lineasMas={L_PUERTA_MAS} lineasMenos={L_PUERTA_MENOS}
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'remates a puerta')]}
+                        onCuota={ponerCuotaNueva} />
+          <LineaMercado titulo="Paradas del portero" unidad="paradas"
+                        lineasMas={L_PARADAS_MAS} lineasMenos={L_PARADAS_MENOS}
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'paradas')]}
+                        onCuota={ponerCuotaNueva} />
+          <LineaMercado titulo="Faltas" unidad="faltas"
+                        lineasMas={L_FALTAS_MAS} lineasMenos={L_FALTAS_MENOS}
+                        puestos={mercados} onAlternar={alternarMercado}
+                        cuota={cuotasNuevo[mercadoActivo(mercados, 'faltas')]}
                         onCuota={ponerCuotaNueva} />
           <span className="eyebrow" style={{ display: 'block', margin: '14px 0 7px' }}>
             Resultado y otros
