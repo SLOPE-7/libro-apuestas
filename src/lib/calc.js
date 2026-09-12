@@ -148,6 +148,48 @@ export function margenSobreCuota(prob, cuota) {
 }
 
 /**
+ * MERCADOS PENDIENTES, agrupados por partido y mercado.
+ *
+ * El mismo "Fortuna Sittard vs Ajax · más de 2.25" puede estar en seis
+ * boletos. Marcarlo seis veces es el trabajo que hace que la gente deje
+ * de marcar, y un historial a medias miente sobre cómo vas.
+ *
+ * Devuelve cada combinación una sola vez, con todos los sitios donde
+ * aparece, para poder resolverla de un toque.
+ */
+export function pendientesPorMercado(apuestas = []) {
+  const mapa = {}
+
+  for (const a of apuestas) {
+    if (estadoApuesta(a) !== 'pendiente') continue
+
+    for (const s of a.selecciones || []) {
+      const subs = Array.isArray(s.mercados) && s.mercados.length
+        ? s.mercados.map((m, i) => ({ texto: m.t, estado: m.e || 'pendiente', i }))
+        : [{ texto: s.mercado, estado: s.estado || 'pendiente', i: null }]
+
+      for (const sub of subs) {
+        if (sub.estado !== 'pendiente') continue
+        const clave = `${s.partido || '—'}||${sub.texto || '—'}`
+        if (!mapa[clave]) mapa[clave] = {
+          clave, partido: s.partido, mercado: sub.texto, sitios: []
+        }
+        mapa[clave].sitios.push({ apuestaId: a.id, selId: s.id, indice: sub.i, stake: Number(a.stake) || 0 })
+      }
+    }
+  }
+
+  return Object.values(mapa)
+    .map(g => ({
+      ...g,
+      boletos: new Set(g.sitios.map(x => x.apuestaId)).size,
+      enJuego: [...new Map(g.sitios.map(x => [x.apuestaId, x.stake])).values()]
+        .reduce((t, v) => t + v, 0)
+    }))
+    .sort((a, b) => b.boletos - a.boletos || b.enJuego - a.enJuego)
+}
+
+/**
  * EXPOSICIÓN REPETIDA.
  *
  * Cuando el mismo mercado del mismo partido está en varios boletos vivos, esos
