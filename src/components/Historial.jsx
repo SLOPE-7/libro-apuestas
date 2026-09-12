@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   cuotaApuesta, cuotaTotal, estadoApuesta, estadoSeleccion,
-  resultado, valorCierre, tieneAnuladaParcial, patasApuesta, exposicion} from '../lib/calc'
+  resultado, valorCierre, tieneAnuladaParcial, patasApuesta, exposicion,
+  pendientesPorMercado} from '../lib/calc'
 import { Escudo } from './Escudo'
 
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v).toFixed(2)
@@ -33,6 +34,8 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
   const [confirmando, setConfirmando] = useState(null)
   const [confirmarPerdida, setConfirmarPerdida] = useState(null)
   const [verExpo, setVerExpo] = useState(false)
+  const [verPend, setVerPend] = useState(false)
+  const porMarcar = pendientesPorMercado(apuestas)
   const expo = exposicion(apuestas)
   const expoTotal = expo.reduce((t, x) => t + x.stake, 0)
 
@@ -177,6 +180,41 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
     if (error) return toast('No se pudo reabrir')
     await sincronizarFecha({ ...a, perdida_manual: false }, a.selecciones || [])
     toast('Boleto reabierto'); onCambio()
+  }
+
+  /**
+   * Marca un partido+mercado en TODOS los boletos donde aparece.
+   * Un partido se juega una vez: su resultado es el mismo en los seis
+   * boletos que lo lleven, y obligar a marcarlo seis veces es lo que
+   * hace que el historial acabe a medias.
+   */
+  async function marcarEnTodos(grupo, valor) {
+    const porSel = new Map()
+    for (const sitio of grupo.sitios) {
+      if (!porSel.has(sitio.selId)) porSel.set(sitio.selId, [])
+      porSel.get(sitio.selId).push(sitio.indice)
+    }
+
+    let fallos = 0
+    for (const [selId, indices] of porSel) {
+      const sel = apuestas.flatMap(a => a.selecciones || []).find(x => x.id === selId)
+      if (!sel) continue
+
+      let cambio
+      if (indices[0] == null) {
+        cambio = { estado: valor }
+      } else {
+        const lista = (sel.mercados || []).map(m => ({ ...m }))
+        for (const i of indices) if (lista[i]) lista[i].e = valor
+        cambio = { mercados: lista }
+      }
+      const { error } = await supabase.from('selecciones').update(cambio).eq('id', selId)
+      if (error) fallos++
+    }
+
+    if (fallos) toast(`${fallos} no se pudieron marcar`)
+    else toast(`${grupo.partido} marcado en ${grupo.boletos} ${grupo.boletos === 1 ? 'boleto' : 'boletos'}`)
+    onCambio()
   }
 
   async function borrar(id) {
@@ -423,6 +461,48 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
           <button className="mini" onClick={revertir}>Deshacer</button>
           <button className="mini" onClick={() => setDeshacer(null)}>Está bien</button>
         </div>
+      )}
+
+      {porMarcar.length > 0 && (
+        <>
+          <button className="grupo-cab" onClick={() => setVerPend(v => !v)}
+                  aria-expanded={verPend}>
+            <span className="grupo-tit">Marcar resultados</span>
+            <span className="grupo-datos">
+              <span className="contador">{porMarcar.length}</span>
+              <span className="chevron">{verPend ? '−' : '+'}</span>
+            </span>
+          </button>
+
+          {verPend && (
+            <div className="card">
+              <p className="ayuda" style={{ marginTop: 0 }}>
+                Cada partido aparece una sola vez. Al marcarlo se aplica a todos los
+                boletos que lo lleven: se juega una vez, así que su resultado es el
+                mismo en todos.
+              </p>
+              {porMarcar.map(g => (
+                <div className="pend" key={g.clave}>
+                  <div className="pend-txt">
+                    <b>{g.partido}</b>
+                    <em>{g.mercado}</em>
+                  </div>
+                  <div className="pend-der">
+                    {g.boletos > 1 && (
+                      <span className="pend-n">{g.boletos} boletos</span>
+                    )}
+                    <button className="sub-btn win" title="Acertó"
+                            onClick={() => marcarEnTodos(g, 'ganada')}>✓</button>
+                    <button className="sub-btn lose" title="Falló"
+                            onClick={() => marcarEnTodos(g, 'perdida')}>✗</button>
+                    <button className="sub-btn void" title="Anulado"
+                            onClick={() => marcarEnTodos(g, 'anulada')}>∅</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {expo.length > 0 && (
