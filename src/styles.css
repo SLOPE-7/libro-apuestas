@@ -1097,3 +1097,29 @@ button:active{transform:scale(.975)}
   .pend{flex-wrap:wrap}
   .pend-der{width:100%;justify-content:flex-end}
 }
+
+
+/* ── Marcar resultados: agrupado por partido ───────────────────────
+   Sesenta mercados sueltos no se pueden repasar. Un partido se mira una
+   vez y sus mercados se resuelven juntos, así que esa es la unidad. */
+.buscador{margin-bottom:12px}
+.pend-partido{border-top:1px solid var(--rule)}
+.pend-partido:first-of-type{border-top:0}
+.pend-cab{
+  display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;
+  background:none;border:0;padding:12px 0;cursor:pointer;
+  text-align:left;font-family:inherit;color:inherit;
+}
+.pend-cab-txt{min-width:0}
+.pend-cab-txt b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.pend-cab-txt em{
+  display:block;font-style:normal;margin-top:3px;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);
+}
+.pend-partido .pend{
+  padding:8px 0 8px 14px;
+  border-top:1px solid var(--rule);border-left:2px solid var(--rule-2);
+  margin-left:2px;
+}
+.pend-partido .pend .pend-txt em{font-size:13.5px;color:var(--ink-2)}
