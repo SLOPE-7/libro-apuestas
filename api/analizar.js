@@ -9,7 +9,11 @@ ORDEN DE TRABAJO OBLIGATORIO:
 
 PASO 1 — Estima el partido SIN mirar los mercados pedidos.
 Antes de leer qué quiere apostar, estima cuánto esperas de este partido concreto:
-goles totales, córners totales y tarjetas amarillas totales. Usa la forma de ambos
+goles totales, córners totales, tarjetas amarillas totales, remates totales,
+remates a puerta totales y faltas totales. Y además el REPARTO entre los dos
+equipos, no solo el total: quién acapara los remates, los córners y la posesión.
+Ese reparto es la base de los mercados por equipo, que suelen pagar mejor que
+el total del partido. Usa la forma de ambos
 equipos, su estilo, el árbitro si te lo dieron y lo que encuentres buscando. Esta
 estimación va en "linea_base" y NO puede depender del mercado que te pidieron.
 
@@ -29,6 +33,19 @@ y no los elijas para que coincidan con su lista: si coinciden, que sea porque lo
 datos llevan ahí.
 No elijas lo más seguro por sistema. "Más de 0.5 goles" al 93% no es un hallazgo,
 es una obviedad que la casa paga a 1.05: no aporta nada y ensucia esta lista.
+
+Y NO TE QUEDES SIEMPRE EN LOS MISMOS CUATRO MERCADOS. Goles totales, ambos marcan,
+tarjetas totales y córners totales son los más apostados del mundo y por eso los
+que la casa afina mejor: ahí casi nunca vas a encontrar una diferencia real.
+Donde sí puede haberla es en los que apuesta poca gente, porque la casa les dedica
+menos atención:
+- mercados de UN equipo (sus córners, sus remates, sus goles, su portería a cero)
+- remates totales y remates a puerta
+- paradas del portero, sobre todo del equipo que va a defender
+- multigoles y hándicap asiático
+- mitades: ambos marcan en una mitad, más goles en la segunda
+Si dos de tus picks son "más de 2.5 goles" y "ambos marcan", párate y pregúntate si
+de verdad son lo mejor que da este partido o solo lo primero que se te ocurrió.
 Busca donde tu estimación se separe de lo que se suele esperar del partido, aunque
 la probabilidad sea del 55% o del 60%. Si de verdad no hay nada que destaque,
 devuelve "picks_ia" vacío: es una respuesta legítima.
@@ -174,9 +191,10 @@ REGLAS:
     equipo entre paréntesis ni cambiar la redacción. Los nombres se agrupan después para
     medir aciertos y cualquier variante rompe la cuenta.
 
-16. Sé BREVE. "datos" máximo 4 o 5 frases. Cada "razon" una sola frase. "linea_base"
-    una línea por magnitud. Prioriza terminar el JSON completo sobre explicarte a fondo:
-    un JSON incompleto es inservible.
+16. Sé BREVE. "datos" máximo 4 frases. Cada "razon" y cada "porque" UNA sola frase
+    de no más de 25 palabras. "linea_base" una línea corta por magnitud.
+    La brevedad no es estética: un JSON cortado a media frase no se puede leer y el
+    análisis entero se pierde. Prioriza cerrarlo sobre explicarte a fondo.
 
 17. Aunque no encuentres casi nada, responde igualmente con el JSON: confianza baja y
     la falta de datos explicada en "datos". Nunca respondas solo con prosa.
@@ -213,7 +231,10 @@ Responde SOLO con un objeto JSON válido, sin texto antes ni después:
   "linea_base": {
     "goles": "cuántos goles esperas y por qué, en una frase",
     "corners": "idem",
-    "tarjetas": "idem"
+    "tarjetas": "idem",
+    "remates": "remates totales y cómo se reparten entre los dos equipos",
+    "remates_puerta": "remates a puerta totales y su reparto",
+    "faltas": "faltas totales, o '—' si no tienes datos"
   },
   "picks_ia": [
     {"mercado": "mercado que eliges tú", "probabilidad": 0.00-1.00, "porque": "una frase"}
@@ -314,7 +335,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: MODELO,
-        max_tokens: 9000,
+        max_tokens: 16000,
         system: INSTRUCCIONES,
         messages: [{ role: 'user', content: pregunta }],
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }]
