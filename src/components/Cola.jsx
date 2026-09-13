@@ -934,7 +934,8 @@ export default function Cola({ toast }) {
                                 <div className="sel">
                                   <span className="eyebrow">Lo que espera del partido</span>
                                   <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
-                                    {['goles', 'corners', 'tarjetas'].map(k =>
+                                    {['goles', 'corners', 'tarjetas',
+                                      'remates', 'remates_puerta', 'faltas'].map(k =>
                                       it.respuesta.linea_base[k] ? (
                                         <li key={k} style={{ marginBottom: 4 }}>
                                           {it.respuesta.linea_base[k]}
