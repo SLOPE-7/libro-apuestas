@@ -1,3 +1,4 @@
+import { estadoApuesta } from './calc'
 /**
  * PRÓXIMOS — qué se te juega y cuándo.
  *
@@ -33,7 +34,11 @@ export function proximos(apuestas = [], ahora = Date.now()) {
 
   for (const a of apuestas) {
     // un boleto cerrado por cash-out ya no depende de lo que pase en la cancha
-    if (a.cash_out != null) continue
+    /* Solo boletos vivos. Uno cerrado por cash-out ya no depende de la
+       cancha, y en una combinada basta UNA pata caída para que el boleto
+       esté perdido: sus otras patas ya no deciden nada y enseñarlas es
+       prometer algo que no puede pasar. */
+    if (estadoApuesta(a) !== 'pendiente') continue
 
     for (const s of a.selecciones || []) {
       if (resueltaSel(s)) continue
