@@ -1,3 +1,4 @@
+import Historico from './Historico'
 import { useState } from 'react'
 
 /**
@@ -6,7 +7,7 @@ import { useState } from 'react'
  */
 export default function LineaMercado({
   titulo, unidad, lineasMas, lineasMenos, puestos, onAlternar,
-  cuota, onCuota
+  cuota, onCuota, historico
 }) {
   // "remates a puerta" llevaría espacios al id, que no son válidos en HTML
   const idCuota = 'lc-' + String(unidad).replace(/\s+/g, '-')
@@ -63,6 +64,7 @@ export default function LineaMercado({
       {/* La cuota se pide aquí, con la línea delante. Estaba en una lista
           aparte más arriba y había que acordarse de a qué mercado
           correspondía cada casilla. */}
+      {activo && <Historico mercado={texto} datos={historico} />}
       {activo && onCuota && (
         <div className="linea-cuota">
           <label htmlFor={idCuota}>Cuota</label>
