@@ -9,11 +9,13 @@ import { paisDe, PAISES } from '../lib/paises'
 import {
   DISCRETOS, L_GOLES, L_CORNERS_MAS, L_CORNERS_MENOS, L_TARJ_MAS, L_TARJ_MENOS,
   L_REMATES_MAS, L_REMATES_MENOS, L_PUERTA_MAS, L_PUERTA_MENOS,
-  L_PARADAS_MAS, L_PARADAS_MENOS, L_FALTAS_MAS, L_FALTAS_MENOS
+  L_PARADAS_MAS, L_PARADAS_MENOS, L_FALTAS_MAS, L_FALTAS_MENOS,
+  rendimientoPorFamilia
 } from '../lib/mercados'
 import { permisoAvisos, pedirPermiso, programar, cancelar } from '../lib/avisos'
 import { cuotaMinima, margenSobreCuota } from '../lib/calc'
 import Varianza from './Varianza'
+import Historico from './Historico'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
 
@@ -63,6 +65,9 @@ export default function Cola({ toast }) {
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false)
   const [confirmarLimpiarPie, setConfirmarLimpiarPie] = useState(false)
   const [guardados, setGuardados] = useState([])
+  /* Tu historial por familia de mercado. Se carga una vez y se usa para
+     enseñarte cómo te ha ido antes, mientras todavía puedes elegir otra cosa. */
+  const [historico, setHistorico] = useState(null)
   const [cupon, setCupon] = useState('')
   const [ligaCupon, setLigaCupon] = useState('')
   const [paisCupon, setPaisCupon] = useState('')
@@ -116,6 +121,15 @@ export default function Cola({ toast }) {
     })
     const pendientes = esperas.current
     return () => Object.values(pendientes).forEach(t => clearTimeout(t))
+  }, [])
+
+  useEffect(() => {
+    /* Solo lo resuelto y con cuota: es lo único que puede decir algo. */
+    supabase.from('sombra')
+      .select('mercado_ia, cuota_ia, acerto_ia')
+      .not('acerto_ia', 'is', null)
+      .limit(2000)
+      .then(({ data }) => setHistorico(rendimientoPorFamilia(data || [])))
   }, [])
 
   useEffect(() => {
@@ -758,17 +772,17 @@ export default function Cola({ toast }) {
                         lineasMas={L_GOLES} lineasMenos={L_GOLES}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'goles')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
           <LineaMercado titulo="Córners" unidad="córners"
                         lineasMas={L_CORNERS_MAS} lineasMenos={L_CORNERS_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'córners')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
           <LineaMercado titulo="Tarjetas" unidad="tarjetas"
                         lineasMas={L_TARJ_MAS} lineasMenos={L_TARJ_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'tarjetas')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
 
           {/* Mercados de volumen. La casa los ajusta menos porque los juega
               menos gente, pero exigen estadística concreta: sin números de
@@ -777,22 +791,22 @@ export default function Cola({ toast }) {
                         lineasMas={L_REMATES_MAS} lineasMenos={L_REMATES_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'remates')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
           <LineaMercado titulo="Remates a puerta" unidad="remates a puerta"
                         lineasMas={L_PUERTA_MAS} lineasMenos={L_PUERTA_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'remates a puerta')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
           <LineaMercado titulo="Paradas del portero" unidad="paradas"
                         lineasMas={L_PARADAS_MAS} lineasMenos={L_PARADAS_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'paradas')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
           <LineaMercado titulo="Faltas" unidad="faltas"
                         lineasMas={L_FALTAS_MAS} lineasMenos={L_FALTAS_MENOS}
                         puestos={mercados} onAlternar={alternarMercado}
                         cuota={cuotasNuevo[mercadoActivo(mercados, 'faltas')]}
-                        onCuota={ponerCuotaNueva} />
+                        onCuota={ponerCuotaNueva} historico={historico} />
           <span className="eyebrow" style={{ display: 'block', margin: '14px 0 7px' }}>
             Resultado y otros
           </span>
@@ -809,11 +823,14 @@ export default function Cola({ toast }) {
             <div className="cuotas-discretos">
               <span className="eyebrow">Cuota de estos mercados</span>
               {mercados.filter(m => DISCRETOS.includes(m)).map(m => (
-                <div className="cuota-linea" key={m}>
-                  <span>{m}</span>
-                  <input inputMode="decimal" placeholder="1.85"
-                         value={cuotasNuevo[m] ?? ''}
-                         onChange={e => ponerCuotaNueva(m, e.target.value)} />
+                <div key={m}>
+                  <div className="cuota-linea">
+                    <span>{m}</span>
+                    <input inputMode="decimal" placeholder="1.85"
+                           value={cuotasNuevo[m] ?? ''}
+                           onChange={e => ponerCuotaNueva(m, e.target.value)} />
+                  </div>
+                  <Historico mercado={m} datos={historico} />
                 </div>
               ))}
             </div>
@@ -973,6 +990,7 @@ export default function Cola({ toast }) {
                                             </span>
                                           )}
                                         </div>
+                                        <Historico mercado={g.mercado} datos={historico} />
                                         {m != null && (
                                           <Varianza mercado={g.mercado}
                                                     prob={g.probabilidad} cuota={real} />
