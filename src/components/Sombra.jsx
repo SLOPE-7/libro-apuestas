@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import CampoLento from './CampoLento'
-import { normalizar } from '../lib/mercados'
+import { normalizar, familiaDe } from '../lib/mercados'
 import { Escudo } from './Escudo'
 
 const pct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%')
@@ -158,22 +158,6 @@ export default function Sombra({ toast }) {
   const yieldSombra = conCuota.length ? retorno / conCuota.length : null
   const cuotaMedia = conCuota.length
     ? conCuota.reduce((s, r) => s + Number(r.cuota_ia), 0) / conCuota.length : null
-
-  /* Familia de mercado: agrupa "Más de 8.5 córners" y "Más de 9.5 córners" juntos. */
-  const familiaDe = m => {
-    const t = normalizar(m).toLowerCase()
-    const lado = t.startsWith('menos') ? 'under' : t.startsWith('más') ? 'over' : ''
-    if (t.includes('córner')) return `córners ${lado}`
-    if (t.includes('tarjeta')) return `tarjetas ${lado}`
-    if (t.includes('primera mitad')) return `1ª mitad ${lado}`
-    if (t.includes('gol')) return `goles ${lado}`
-    if (t.includes('doble oportunidad')) return 'doble oportunidad'
-    if (t.includes('hándicap')) return 'hándicap'
-    if (t.startsWith('1x2')) return '1X2'
-    if (t.includes('ambos')) return 'ambos marcan'
-    if (t.includes('clasifica')) return 'se clasifica'
-    return normalizar(m)
-  }
 
   const porMercado    = agrupar(conCuota, r => normalizar(r.mercado_ia))
   const porFamilia    = agrupar(conCuota, r => familiaDe(r.mercado_ia))
