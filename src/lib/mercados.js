@@ -103,3 +103,54 @@ export function normalizar(nombre) {
 
   return t
 }
+
+
+/**
+ * Familia de un mercado: agrupa "Más de 8.5 córners" y "Más de 9.5 córners"
+ * bajo la misma etiqueta. Vive aquí porque ahora la usan dos pantallas —
+ * Sombra para el desglose y la Cola para enseñarte tu historial mientras
+ * eliges. Tenerla duplicada era garantía de que se desincronizaran.
+ */
+export function familiaDe(m) {
+  const t = normalizar(m).toLowerCase()
+  const lado = t.startsWith('menos') ? 'under' : t.startsWith('más') ? 'over' : ''
+  if (t.includes('córner')) return `córners ${lado}`
+  if (t.includes('tarjeta')) return `tarjetas ${lado}`
+  if (t.includes('primera mitad')) return `1ª mitad ${lado}`
+  if (t.includes('remates a puerta')) return `remates a puerta ${lado}`
+  if (t.includes('remate')) return `remates ${lado}`
+  if (t.includes('parada')) return `paradas ${lado}`
+  if (t.includes('falta')) return `faltas ${lado}`
+  if (t.includes('multigol')) return 'multigoles'
+  if (t.includes('gol')) return `goles ${lado}`
+  if (t.includes('doble oportunidad')) return 'doble oportunidad'
+  if (t.includes('asiático')) return 'hándicap asiático'
+  if (t.includes('hándicap')) return 'hándicap'
+  if (t.startsWith('1x2')) return '1X2'
+  if (t.includes('ambos')) return 'ambos marcan'
+  if (t.includes('clasifica')) return 'se clasifica'
+  return normalizar(m)
+}
+
+/**
+ * Rendimiento histórico por familia, a partir de los registros de Sombra.
+ * Solo cuentan los resueltos con cuota: sin precio, acertar no dice nada.
+ */
+export function rendimientoPorFamilia(registros = []) {
+  const mapa = {}
+  for (const r of registros) {
+    if (r.acerto_ia == null) continue
+    const c = Number(r.cuota_ia)
+    if (!(c > 1)) continue
+    const k = familiaDe(r.mercado_ia)
+    if (!mapa[k]) mapa[k] = { n: 0, ok: 0, suma: 0 }
+    mapa[k].n++
+    if (r.acerto_ia) mapa[k].ok++
+    mapa[k].suma += r.acerto_ia ? c - 1 : -1
+  }
+  const out = {}
+  for (const [k, v] of Object.entries(mapa)) {
+    out[k] = { n: v.n, acierto: v.ok / v.n, yield: v.suma / v.n }
+  }
+  return out
+}
