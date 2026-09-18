@@ -208,7 +208,13 @@ export default function Historial({ apuestas, casas, onCambio, toast, destacada,
 
       let cambio
       if (indices[0] == null) {
+        /* Selección de un solo mercado: manda el estado de la selección.
+           Se escribe también en mercados[0] por si el boleto lo trae, para
+           que las dos vistas cuenten lo mismo. */
         cambio = { estado: valor }
+        if (Array.isArray(sel.mercados) && sel.mercados.length === 1) {
+          cambio.mercados = [{ ...sel.mercados[0], e: valor }]
+        }
       } else {
         const lista = (sel.mercados || []).map(m => ({ ...m }))
         for (const i of indices) if (lista[i]) lista[i].e = valor
