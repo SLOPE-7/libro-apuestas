@@ -164,9 +164,18 @@ export function pendientesPorMercado(apuestas = []) {
     if (estadoApuesta(a) !== 'pendiente') continue
 
     for (const s of a.selecciones || []) {
-      const subs = Array.isArray(s.mercados) && s.mercados.length
+      /* Con UN solo mercado, estadoSeleccion() ignora mercados[0].e y lee
+         s.estado. Si aquí devolviéramos un índice, el marcado escribiría en
+         un campo que nadie consulta y el boleto seguiría vivo para siempre.
+         El criterio tiene que ser el mismo en los dos sitios. */
+      const porMercado = Array.isArray(s.mercados) && s.mercados.length > 1
+      const subs = porMercado
         ? s.mercados.map((m, i) => ({ texto: m.t, estado: m.e || 'pendiente', i }))
-        : [{ texto: s.mercado, estado: s.estado || 'pendiente', i: null }]
+        : [{
+            texto: (Array.isArray(s.mercados) && s.mercados[0]?.t) || s.mercado || '(sin mercado)',
+            estado: s.estado || 'pendiente',
+            i: null
+          }]
 
       for (const sub of subs) {
         if (sub.estado !== 'pendiente') continue
