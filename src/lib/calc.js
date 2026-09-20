@@ -164,18 +164,9 @@ export function pendientesPorMercado(apuestas = []) {
     if (estadoApuesta(a) !== 'pendiente') continue
 
     for (const s of a.selecciones || []) {
-      /* Con UN solo mercado, estadoSeleccion() ignora mercados[0].e y lee
-         s.estado. Si aquí devolviéramos un índice, el marcado escribiría en
-         un campo que nadie consulta y el boleto seguiría vivo para siempre.
-         El criterio tiene que ser el mismo en los dos sitios. */
-      const porMercado = Array.isArray(s.mercados) && s.mercados.length > 1
-      const subs = porMercado
+      const subs = Array.isArray(s.mercados) && s.mercados.length
         ? s.mercados.map((m, i) => ({ texto: m.t, estado: m.e || 'pendiente', i }))
-        : [{
-            texto: (Array.isArray(s.mercados) && s.mercados[0]?.t) || s.mercado || '(sin mercado)',
-            estado: s.estado || 'pendiente',
-            i: null
-          }]
+        : [{ texto: s.mercado, estado: s.estado || 'pendiente', i: null }]
 
       for (const sub of subs) {
         if (sub.estado !== 'pendiente') continue
@@ -429,6 +420,48 @@ export const clv = (tomada, cierre) =>
 
 /** Fecha con la que ordenar la curva: la de resolución si existe, si no la de registro. */
 const fechaOrden = a => a.fecha_resuelta || a.fecha || ''
+
+/**
+ * GANANCIAS Y PÉRDIDAS POR DÍA.
+ *
+ * Se agrupa por el día en que la apuesta SE RESOLVIÓ, no por el día en que
+ * la registraste: un boleto firmado el viernes que se decide el domingo es
+ * dinero del domingo. Sin esa distinción, un cupón de fin de semana entero
+ * se colgaría de un solo día y la lectura sería falsa.
+ *
+ * Los boletos pendientes no aparecen: todavía no son ni ganancia ni pérdida.
+ */
+export function porDia(apuestas = []) {
+  const dias = {}
+
+  for (const a of apuestas) {
+    const e = estadoApuesta(a)
+    if (e === 'pendiente') continue
+
+    const dia = String(a.fecha_resuelta || a.fecha || '').slice(0, 10)
+    if (!dia) continue
+
+    if (!dias[dia]) dias[dia] = {
+      dia, n: 0, ganadas: 0, perdidas: 0, anuladas: 0,
+      apostado: 0, resultado: 0
+    }
+    const d = dias[dia]
+    const stake = Number(a.stake) || 0
+
+    d.n++
+    if (e === 'ganada') d.ganadas++
+    else if (e === 'perdida') d.perdidas++
+    else if (e === 'anulada') d.anuladas++
+
+    // las anuladas no son turnover: no ganaste ni perdiste nada
+    if (e !== 'anulada') d.apostado += stake
+    d.resultado += resultado(a)
+  }
+
+  return Object.values(dias)
+    .map(d => ({ ...d, yield: d.apostado ? d.resultado / d.apostado : null }))
+    .sort((x, y) => y.dia.localeCompare(x.dia))
+}
 
 export function resumen(apuestas = [], casas = [], movimientos = []) {
   const conEstado = apuestas.map(a => ({ ...a, _e: estadoApuesta(a), _r: resultado(a) }))
