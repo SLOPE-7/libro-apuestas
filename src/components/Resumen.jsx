@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from 'recharts'
-import { diagnostico } from '../lib/calc'
+import { diagnostico, porDia } from '../lib/calc'
 import { proximos, cuandoEmpieza } from '../lib/proximos'
 import { Escudo } from './Escudo'
+
+/** "Hoy", "Ayer" o la fecha corta. */
+function etiquetaDia(iso) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  const d = new Date(`${iso}T00:00:00`)
+  const dif = Math.round((d - hoy) / 86400000)
+  if (dif === 0) return 'Hoy'
+  if (dif === -1) return 'Ayer'
+  return d.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })
+}
 
 const money = v => (v < 0 ? '-' : '') + 'L' + Math.abs(v).toFixed(2)
 const pct = v => (v === null || v === undefined ? '—' : (v * 100).toFixed(1) + '%')
@@ -19,6 +29,9 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [])
   const dias = proximos(apuestas, ahora)
+  const [verDias, setVerDias] = useState(false)
+  const porFecha = porDia(apuestas)
+
   const reducirMovimiento = typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   /* Hoy y mañana se ven siempre; el resto solo si tocas su fecha. Con treinta
@@ -103,6 +116,57 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
             propósito: es la pantalla que miras con el partido en curso.
           </p>
         </div>
+      )}
+
+      {porFecha.length > 0 && (
+        <>
+          <button className="grupo-cab" onClick={() => setVerDias(v => !v)}
+                  aria-expanded={verDias} style={{ marginTop: 4 }}>
+            <span className="grupo-tit">Por día</span>
+            <span className="grupo-datos">
+              <span className={`monto ${porFecha[0].resultado >= 0 ? 'pos' : 'neg'}`}>
+                {porFecha[0].resultado >= 0 ? '+' : '−'}L{Math.abs(porFecha[0].resultado).toFixed(2)}
+              </span>
+              <span className="chevron">{verDias ? '−' : '+'}</span>
+            </span>
+          </button>
+
+          {verDias && (
+            <div className="card">
+              <table>
+                <tbody>
+                  <tr>
+                    <th>Día</th><th>N</th><th>Apostado</th><th>Resultado</th><th>Yield</th>
+                  </tr>
+                  {porFecha.slice(0, 30).map(d => (
+                    <tr key={d.dia}>
+                      <td>
+                        {etiquetaDia(d.dia)}
+                        <em className="dia-gp">
+                          {d.ganadas}G · {d.perdidas}P{d.anuladas ? ` · ${d.anuladas}A` : ''}
+                        </em>
+                      </td>
+                      <td>{d.n}</td>
+                      <td>L{d.apostado.toFixed(2)}</td>
+                      <td className={d.resultado >= 0 ? 'pos' : 'neg'}>
+                        {d.resultado >= 0 ? '+' : '−'}L{Math.abs(d.resultado).toFixed(2)}
+                      </td>
+                      <td className={d.yield == null ? '' : d.yield > 0 ? 'pos' : 'neg'}>
+                        {d.yield == null ? '—'
+                          : (d.yield > 0 ? '+' : '') + (d.yield * 100).toFixed(1) + '%'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="ayuda">
+                Por el día en que la apuesta se resolvió, no en el que la registraste.
+                Un día suelto no dice nada: mira si el patrón se repite. Las anuladas
+                no cuentan como apostado.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       <div className="figs figs-alta">
