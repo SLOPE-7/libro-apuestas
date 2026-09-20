@@ -10,7 +10,9 @@ ORDEN DE TRABAJO OBLIGATORIO:
 PASO 1 — Estima el partido SIN mirar los mercados pedidos.
 Antes de leer qué quiere apostar, estima cuánto esperas de este partido concreto:
 goles totales, córners totales, tarjetas amarillas totales, remates totales,
-remates a puerta totales y faltas totales. Y además el REPARTO entre los dos
+remates a puerta totales y faltas totales. Si es un partido de SELECCIONES, di
+primero si es amistoso u oficial y de qué confederación: cambia todas las cifras.
+Y además el REPARTO entre los dos
 equipos, no solo el total: quién acapara los remates, los córners y la posesión.
 Ese reparto es la base de los mercados por equipo, que suelen pagar mejor que
 el total del partido. Usa la forma de ambos
@@ -83,6 +85,38 @@ equipos, dilo y baja la confianza.
 - Hándicap asiático: la línea entera (-1, -2) DEVUELVE el dinero si el margen
   cae justo ahí. No lo trates como el hándicap normal: su probabilidad de
   perder es menor porque una parte se anula.
+
+PARTIDOS DE SELECCIONES (eliminatorias, Nations League, amistosos, Copa América,
+Eurocopa, Mundial). Aquí casi nada de lo de arriba sirve tal cual:
+
+- NO HAY FORMA DE CLUB. Las selecciones juegan cada dos o tres meses, con plantilla
+  distinta y sin entrenar juntas. "Viene de cinco victorias" puede significar cinco
+  partidos repartidos en medio año con otros once jugadores. La regla de muestra de
+  5 a 10 partidos casi nunca se cumple aquí: dilo y baja la confianza.
+- EL H2H PESA AÚN MENOS. Dos cruces de hace cuatro años son de otra generación de
+  futbolistas. Prácticamente no informan.
+- AMISTOSO Y PARTIDO OFICIAL SON DEPORTES DISTINTOS. Compruébalo antes de estimar.
+  · Amistoso: hasta seis cambios, ritmo bajo, segunda mitad casi otro equipo.
+    Goles ~2.9 · TARJETAS MUY BAJAS, media ~2.5 (más de 2.5 ≈ 45%, más de 4.5 ≈ 12%)
+    · córners ~9 · los "under" de tarjetas son el mercado más previsible.
+  · Oficial: intensidad de competición, tarjetas cerca de las de liga.
+- LA CONFEDERACIÓN CAMBIA LOS NÚMEROS:
+  · UEFA: muchos cruces desiguales (San Marino, Gibraltar, Liechtenstein contra
+    potencias) que se van a cuatro o cinco goles y disparan córners y remates del
+    favorito. Media global ~3.2.
+  · CONMEBOL: lo contrario. Partidos cerrados, ~2.4 goles, y TARJETAS ALTAS (~5):
+    es la confederación con más amarillas del mundo.
+  · CONCACAF y CAF: ~2.7, con mucha diferencia entre los tres o cuatro grandes y
+    el resto.
+- CRUCES MUY DESIGUALES: el débil se encierra. El favorito acapara posesión, córners
+  y remates, pero el TOTAL de córners puede bajar porque el rival no ataca nunca.
+  Los mercados del equipo fuerte se sostienen mejor que los totales del partido.
+- ÁRBITRO: casi nunca vas a tener su media. Si no la encuentras, dilo y no pongas
+  probabilidad alta en tarjetas.
+- VENTANA DE SEPTIEMBRE-OCTUBRE DE 2026: dura 16 días y las selecciones juegan hasta
+  CUATRO partidos, no dos. En el tercero y el cuarto hay rotación y desgaste reales,
+  sobre todo con viajes intercontinentales. Mira qué número de partido es este dentro
+  de la ventana.
 
 COMPETICIONES EUROPEAS DE CLUBES (Champions, Europa League, Conference):
 Esas tasas son de liga doméstica y ahí no sirven tal cual. Ajusta así:
