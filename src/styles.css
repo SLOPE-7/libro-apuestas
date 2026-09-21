@@ -1132,3 +1132,72 @@ button:active{transform:scale(.975)}
   font-family:"IBM Plex Mono",monospace;
   font-size:10px;letter-spacing:.06em;color:var(--ink-faint);
 }
+
+/* ── ¿Cuadra con tus casas? ────────────────────────────────────────
+   La app solo sabe lo que le registraste. Esta sección compara con lo
+   que ves en las casas de verdad, que es la única banca que existe. */
+.cuadre{
+  background:var(--card);box-shadow:var(--sh);border-radius:var(--r);
+  padding:16px;margin-bottom:16px;border-left:4px solid var(--tinta-azul, var(--ink));
+}
+.cuadre-filas{margin-top:10px;display:flex;flex-direction:column;gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.cuadre-filas > div{
+  display:flex;justify-content:space-between;align-items:baseline;
+  background:var(--card);padding:10px 12px;font-size:14px;color:var(--ink-2);
+}
+.cuadre-filas b{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:16px;color:var(--ink);
+}
+.cuadre-dif.mal{background:var(--loss-fondo)!important}
+.cuadre-dif.mal b{color:var(--loss)}
+.cuadre-dif.ok{background:var(--gain-fondo)!important}
+.cuadre-dif.ok b{color:var(--gain)}
+
+.real-casa{
+  background:var(--card-2);border-radius:var(--r);padding:11px;margin-bottom:12px;
+}
+.real-ok{margin-top:8px;font-size:13px;color:var(--gain);font-weight:600}
+.real-dif{
+  display:flex;flex-direction:column;gap:8px;margin-top:9px;
+  font-size:13px;line-height:1.45;color:var(--ink-2);
+}
+.real-dif b{font-family:"IBM Plex Mono",monospace;color:var(--loss)}
+.real-dif em{font-style:normal;color:var(--ink-faint);font-size:12px}
+.real-dif .tiny{align-self:flex-start}
+
+/* ── Cada casa en cifras ───────────────────────────────────────────
+   Saldo actual es lo DISPONIBLE: lo que enseña la app de la casa, sin
+   lo que está en juego. Así se puede comprobar con un vistazo. */
+.casa-cifras{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:var(--r);
+  overflow:hidden;margin-bottom:6px;
+}
+.casa-cifras > div{background:var(--card);padding:9px 11px;display:flex;flex-direction:column;gap:2px}
+.casa-cifras span{
+  font-family:"IBM Plex Mono",monospace;font-size:8.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);
+}
+.casa-cifras b{
+  font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+.casa-cifras b.pos{color:var(--gain)}
+.casa-cifras b.neg{color:var(--loss)}
+.casa-nota{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.04em;
+  color:var(--ink-faint);margin-bottom:12px;
+}
+
+/* debajo de la banca en Resumen */
+.banca-casas{
+  font-size:12.5px;color:var(--ink-soft);
+  margin:-10px 0 14px;padding:0 2px;line-height:1.6;
+}
+.banca-casas b{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  color:var(--ink-2);font-weight:600;
+}
+.banca-juego{color:var(--caution)}
