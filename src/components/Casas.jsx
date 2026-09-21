@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { inicialParaCuadrar } from '../lib/calc'
+import Avisos from './Avisos'
 
 const money = v => (v < 0 ? '−' : '') + 'L' + Math.abs(v || 0).toFixed(2)
 
@@ -361,6 +362,10 @@ export default function Casas({ casas, movimientos, apuestas = [], resumen, onCa
         <strong>Retirar ganancias es buena costumbre.</strong> Deja tu banca en el tamaño
         que decidiste y evita que las rachas buenas se conviertan en apuestas más grandes.
         Regístralo aquí y el saldo seguirá cuadrando.
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <Avisos toast={toast} />
       </div>
 
       <div style={{ marginTop: 20 }}>
