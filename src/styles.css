@@ -1202,3 +1202,10 @@ button:active{transform:scale(.975)}
   color:var(--ink-2);font-weight:600;
 }
 .banca-juego{color:var(--caution)}
+
+/* ── Avisos al teléfono ────────────────────────────────────────────
+   Dice qué falta en vez de un botón que no hace nada: en iPhone lo
+   más común es que la app no esté instalada. */
+.avisos{border-left:4px solid var(--rule-hard)}
+.avisos.on{border-left-color:var(--gain)}
+.avisos-txt{font-size:13.5px;line-height:1.55;color:var(--ink-2);margin:8px 0 12px}
