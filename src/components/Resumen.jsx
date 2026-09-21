@@ -178,6 +178,22 @@ export default function Resumen({ r, apuestas = [], onAbrir }) {
         ))}
       </div>
 
+      {/* Debajo de la banca, cada casa con lo que ves en su app: lo disponible,
+          sin lo que está en juego. Es el número que puedes comprobar. */}
+      {r.porCasa?.length > 0 && (
+        <p className="banca-casas">
+          {r.porCasa.map((c, i) => (
+            <span key={c.id}>
+              {i > 0 && <span className="sep"> · </span>}
+              {c.nombre} <b>{money(c.disponible)}</b>
+            </span>
+          ))}
+          {r.enJuego > 0 && (
+            <span className="banca-juego"> · {money(r.enJuego)} en juego</span>
+          )}
+        </p>
+      )}
+
       <div className="figs figs-baja">
         {secundarias.map(([k, v, c]) => (
           <div className="fig" key={k}>
