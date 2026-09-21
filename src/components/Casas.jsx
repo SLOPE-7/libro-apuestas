@@ -92,6 +92,31 @@ export default function Casas({ casas, movimientos, apuestas = [], resumen, onCa
     onCambio()
   }
 
+  async function guardar() {
+    setGuardando(true)
+    for (const c of borrador) {
+      const { error } = await supabase.from('casas').update({
+        nombre: c.nombre.trim() || 'Sin nombre',
+        saldo_inicial: Number(c.saldo_inicial) || 0
+      }).eq('id', c.id)
+      if (error) { setGuardando(false); return toast('No se pudo guardar: ' + error.message) }
+    }
+    setGuardando(false)
+    toast('Saldos guardados')
+    onCambio()
+  }
+
+  async function movimiento(casaId, tipo) {
+    const m = Number(monto)
+    if (!(m > 0)) return toast('Escribe un monto')
+    const { error } = await supabase.from('movimientos')
+      .insert({ casa_id: casaId, tipo, monto: m, nota: nota.trim() || null })
+    if (error) return toast('No se pudo registrar: ' + error.message)
+    setMonto(''); setNota('')
+    toast(tipo === 'deposito' ? 'Depósito registrado' : 'Retiro registrado')
+    onCambio()
+  }
+
   async function borrarMovimiento(id) {
     const { error } = await supabase.from('movimientos').delete().eq('id', id)
     if (error) return toast('No se pudo borrar')
