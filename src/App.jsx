@@ -123,7 +123,7 @@ export default function App() {
 
             {tab === 'casas' && (
               <>
-                <Casas casas={casas} movimientos={movimientos} resumen={r}
+                <Casas casas={casas} movimientos={movimientos} apuestas={apuestas} resumen={r}
                        onCambio={cargar} toast={toast} />
                 {/* La calculadora de comisión vive aquí porque habla de lo
                     mismo que esta pantalla: lo que cobra la casa. */}
