@@ -463,6 +463,49 @@ export function porDia(apuestas = []) {
     .sort((x, y) => y.dia.localeCompare(x.dia))
 }
 
+/**
+ * LA CUENTA DE UNA CASA.
+ *
+ * saldo      = inicial + movimientos + resultado de las apuestas resueltas.
+ * enJuego    = lo apostado en boletos que siguen abiertos.
+ * disponible = saldo − enJuego. Es lo que te enseña la app de la casa:
+ *              en cuanto apuestas 100 de 900, la casa te muestra 800.
+ *
+ * Si la casa tiene fecha de corte (un reinicio de banca), solo cuenta lo
+ * que se resolvió o se movió desde ese día. Lo de antes ya está dentro
+ * del saldo inicial.
+ */
+export function cuentaCasa(casa, apuestas = [], movimientos = []) {
+  const desde = casa.corte || null
+  const dentro = f => !desde || (!!f && String(f).slice(0, 10) >= desde)
+  const suyas = apuestas
+    .filter(a => a.casa_id === casa.id)
+    .map(a => ({ ...a, _e: a._e ?? estadoApuesta(a), _r: a._r ?? resultado(a) }))
+
+  const resueltas = suyas.filter(a => a._e !== 'pendiente' && dentro(a.fecha_resuelta ?? a.fecha))
+  const neto = resueltas.reduce((t, a) => t + a._r, 0)
+  const ganancias = resueltas.filter(a => a._r > 0).reduce((t, a) => t + a._r, 0)
+  const perdidas = resueltas.filter(a => a._r < 0).reduce((t, a) => t - a._r, 0)
+  const enJuego = suyas.filter(a => a._e === 'pendiente')
+    .reduce((t, a) => t + (Number(a.stake) || 0), 0)
+  const mov = movimientos
+    .filter(m => m.casa_id === casa.id && dentro(m.fecha))
+    .reduce((t, m) => t + (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0), 0)
+
+  const saldo = Number(casa.saldo_inicial || 0) + mov + neto
+  return { neto, ganancias, perdidas, enJuego, movimientos: mov, saldo, disponible: saldo - enJuego }
+}
+
+/**
+ * Saldo inicial que hace que la casa cuadre HOY con lo que muestra su app.
+ * Tiene en cuenta lo que ya se resolvió hoy y lo que está en juego, para que
+ * justo después del reinicio "disponible" sea exactamente el saldo real.
+ */
+export function inicialParaCuadrar(casa, saldoReal, apuestas = [], movimientos = [], hoy) {
+  const c = cuentaCasa({ ...casa, saldo_inicial: 0, corte: hoy }, apuestas, movimientos)
+  return Math.round((Number(saldoReal) - c.disponible) * 100) / 100
+}
+
 export function resumen(apuestas = [], casas = [], movimientos = []) {
   const conEstado = apuestas.map(a => ({ ...a, _e: estadoApuesta(a), _r: resultado(a) }))
 
@@ -504,11 +547,19 @@ export function resumen(apuestas = [], casas = [], movimientos = []) {
    * punto coincida siempre con la banca de arriba. Antes solo acumulaba
    * resultados y la gráfica se desincronizaba en cuanto movías dinero.
    */
+  const porCasa = casas.map(c => ({ ...c, ...cuentaCasa(c, conEstado, movimientos) }))
+  /* Solo entra en la curva lo que cuenta para alguna casa, desde su corte. */
+  const cuenta = (casaId, f) => {
+    const c = casas.find(x => x.id === casaId)
+    if (!c) return false
+    return !c.corte || (!!f && String(f).slice(0, 10) >= c.corte)
+  }
+
   const eventos = [
     ...conEstado
-      .filter(a => a._e !== 'pendiente')
+      .filter(a => a._e !== 'pendiente' && cuenta(a.casa_id, fechaOrden(a)))
       .map(a => ({ fecha: fechaOrden(a), orden: 1, delta: a._r, tipo: 'apuesta' })),
-    ...movimientos.map(m => ({
+    ...movimientos.filter(m => cuenta(m.casa_id, m.fecha)).map(m => ({
       fecha: m.fecha || '',
       orden: 0,
       delta: (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0),
@@ -534,7 +585,11 @@ export function resumen(apuestas = [], casas = [], movimientos = []) {
 
   return {
     inicial,
-    banca: inicial + movNeto + neto,
+    /* La banca es el dinero que tienes en tus casas, no el total histórico.
+       Antes era inicial + movimientos + TODO el resultado, y las ganancias de
+       casas que ya quitaste seguían sumando aunque ese dinero se retiró. */
+    banca: porCasa.reduce((t, c) => t + c.saldo, 0),
+    enJuego: porCasa.reduce((t, c) => t + c.enJuego, 0),
     neto,
     depositado,
     retirado,
@@ -551,12 +606,7 @@ export function resumen(apuestas = [], casas = [], movimientos = []) {
     rango: rangoYield(apuestas),
     simples: porTipo(false),
     parlays: porTipo(true),
-    porCasa: casas.map(c => {
-      const n = conEstado.filter(a => a.casa_id === c.id).reduce((s, a) => s + a._r, 0)
-      const mv = movimientos.filter(m => m.casa_id === c.id).reduce(
-        (s, m) => s + (m.tipo === 'deposito' ? 1 : -1) * Number(m.monto || 0), 0)
-      return { ...c, neto: n, movimientos: mv, saldo: Number(c.saldo_inicial || 0) + mv + n }
-    }),
+    porCasa,
     curva
   }
 }
