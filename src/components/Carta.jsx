@@ -10,6 +10,11 @@ import { dibujarCarta, ANCHO, ALTO, momios } from '../lib/carta'
    Nada se inventa aquí: los mercados y las probabilidades salen del
    análisis guardado. Lo único que pones tú son las cuotas, porque esas
    las ves en tu casa de apuestas y cambian a cada rato.
+
+   Los escudos de equipo, y ahora también el logo de la liga y el de
+   país, se guardan en la misma tabla `escudos` (clave → imagen). La
+   liga y el país se guardan con su propio nombre como clave, igual
+   que un equipo más.
    --------------------------------------------------------------------- */
 
 const norm = s => String(s || '').trim().toLowerCase()
@@ -66,7 +71,8 @@ export default function Carta({ toast }) {
       .then(({ data }) => setEscudos(Object.fromEntries((data || []).map(e => [e.equipo, e.imagen]))))
   }, [])
 
-  /* Los escudos guardados se convierten en imágenes de verdad una sola vez. */
+  /* Los escudos guardados (equipos, liga, país) se convierten en
+     imágenes de verdad una sola vez. */
   useEffect(() => {
     let vivo = true
     Promise.all(Object.entries(escudos).map(async ([k, v]) => [k, await cargarImagen(v)]))
@@ -111,22 +117,26 @@ export default function Carta({ toast }) {
       formato,
       picks: elegidos.slice(0, 6).map(p => ({ ...p, cuota: Number(p.cuota) || null })),
       escudoLocal: imgs[norm(sel.local)] || null,
-      escudoVisitante: imgs[norm(sel.visitante)] || null
+      escudoVisitante: imgs[norm(sel.visitante)] || null,
+      escudoLiga: sel.competicion ? (imgs[norm(sel.competicion)] || null) : null,
+      escudoPais: sel.pais ? (imgs[norm(sel.pais)] || null) : null
     })
   }, [sel, analisis, picks, formato, imgs])
 
   useEffect(() => { pintar() }, [pintar])
 
-  async function subirEscudo(equipo, archivo) {
+  /** Sube el escudo de un equipo, o el logo de la liga o del país:
+   *  todos se guardan igual, con su nombre como clave. */
+  async function subirEscudo(clave, archivo) {
     if (!archivo) return
     try {
       const imagen = await aDataURI(archivo)
-      const clave = norm(equipo)
+      const k = norm(clave)
       const { error } = await supabase.from('escudos')
-        .upsert({ equipo: clave, imagen }, { onConflict: 'user_id,equipo' })
+        .upsert({ equipo: k, imagen }, { onConflict: 'user_id,equipo' })
       if (error) throw new Error(error.message)
-      setEscudos(e => ({ ...e, [clave]: imagen }))
-      toast('Escudo guardado para ' + equipo)
+      setEscudos(e => ({ ...e, [k]: imagen }))
+      toast('Logo guardado para ' + clave)
     } catch (e) { toast(e.message) }
   }
 
@@ -244,6 +254,28 @@ export default function Carta({ toast }) {
                 <span className="nom">{eq}</span>
                 <input type="file" accept="image/*" hidden
                        onChange={e => subirEscudo(eq, e.target.files?.[0])} />
+              </label>
+            ))}
+          </div>
+
+          <h3 className="sub">Logo de liga y de país</h3>
+          <p className="ayuda" style={{ marginTop: -6 }}>
+            Opcional. Se guardan igual que un escudo, usando el nombre de la
+            competición y del país como clave: si vuelve a salir la misma liga
+            o el mismo país en otro partido, ya no hay que subirlo de nuevo.
+          </p>
+          <div className="row c2">
+            {[
+              { clave: sel.competicion, etiqueta: 'Liga / competición' },
+              { clave: sel.pais, etiqueta: 'País' }
+            ].filter(x => x.clave).map(({ clave, etiqueta }) => (
+              <label key={clave} className="subir-escudo">
+                {imgs[norm(clave)]
+                  ? <img src={escudos[norm(clave)]} alt="" />
+                  : <span className="sin-escudo">sin logo</span>}
+                <span className="nom">{etiqueta}: {clave}</span>
+                <input type="file" accept="image/*" hidden
+                       onChange={e => subirEscudo(clave, e.target.files?.[0])} />
               </label>
             ))}
           </div>
