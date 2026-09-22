@@ -81,16 +81,20 @@ export async function probarAviso() {
   if (error) {
     const st = error.context?.status
     let detalle = ''
-    try { detalle = await error.context?.text?.() } catch { /* sin cuerpo */ }
+    try {
+      const t = await error.context?.text?.()
+      detalle = (t && JSON.parse(t).error) || t || ''
+    } catch { /* cuerpo vacío o no JSON */ }
 
+    // sin estado = el teléfono ni llegó a conectar: la función no arrancó
+    if (!st) throw new Error('No se pudo llegar a la función: se cae al arrancar. Casi siempre es un secret mal puesto (VAPID_SUBJECT debe empezar con "mailto:") o la verificación JWT sigue activa. Mira sus Logs en Supabase.')
     if (st === 404) throw new Error('La función "avisar-partidos" no existe en Supabase. Revisa que se desplegó con ese nombre exacto.')
     if (st === 401) throw new Error('La función rechazó la sesión. Cierra sesión en la app, vuelve a entrar y prueba de nuevo.')
-    if (st === 500 || st === 503) throw new Error('La función falló al arrancar (' + st + '). Casi siempre es un secret que falta o tiene otro nombre. ' + String(detalle).slice(0, 120))
-    throw new Error('Error ' + (st || '') + ' al llamar a la función: ' + String(detalle || error.message).slice(0, 160))
+    throw new Error(detalle ? String(detalle).slice(0, 200) : `La función respondió con error ${st}.`)
   }
 
   if (!data?.enviados) {
-    throw new Error('La función respondió, pero no pudo entregar el aviso. Toca Desactivar, luego Activar avisos otra vez, y vuelve a probar.')
+    throw new Error(data?.motivo || 'La función respondió, pero no pudo entregar el aviso. Toca Desactivar, luego Activar avisos otra vez, y vuelve a probar.')
   }
   return data.enviados
 }
