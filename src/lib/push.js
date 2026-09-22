@@ -69,8 +69,28 @@ export async function desactivarAvisos() {
   await sub.unsubscribe()
 }
 
-/** Manda un aviso de prueba a este usuario, para comprobar que llega. */
+/**
+ * Manda un aviso de prueba a este usuario, para comprobar que llega.
+ * Si falla, lanza un error que dice QUÉ falló, en vez de un "no llegó"
+ * genérico: función inexistente, llaves mal puestas o teléfono sin guardar
+ * son problemas distintos con arreglos distintos.
+ */
 export async function probarAviso() {
-  const { data } = await supabase.functions.invoke('avisar-partidos', { body: { prueba: true } })
-  return data?.enviados ?? 0
+  const { data, error } = await supabase.functions.invoke('avisar-partidos', { body: { prueba: true } })
+
+  if (error) {
+    const st = error.context?.status
+    let detalle = ''
+    try { detalle = await error.context?.text?.() } catch { /* sin cuerpo */ }
+
+    if (st === 404) throw new Error('La función "avisar-partidos" no existe en Supabase. Revisa que se desplegó con ese nombre exacto.')
+    if (st === 401) throw new Error('La función rechazó la sesión. Cierra sesión en la app, vuelve a entrar y prueba de nuevo.')
+    if (st === 500 || st === 503) throw new Error('La función falló al arrancar (' + st + '). Casi siempre es un secret que falta o tiene otro nombre. ' + String(detalle).slice(0, 120))
+    throw new Error('Error ' + (st || '') + ' al llamar a la función: ' + String(detalle || error.message).slice(0, 160))
+  }
+
+  if (!data?.enviados) {
+    throw new Error('La función respondió, pero no pudo entregar el aviso. Toca Desactivar, luego Activar avisos otra vez, y vuelve a probar.')
+  }
+  return data.enviados
 }
