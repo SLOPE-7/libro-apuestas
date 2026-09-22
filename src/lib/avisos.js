@@ -1,49 +1,69 @@
-/**
- * Avisos de partidos que empiezan.
- *
- * LÍMITE IMPORTANTE: sin un servidor detrás, el aviso solo salta si la app
- * sigue viva en memoria. Si la cierras del todo desde el multitarea, no llega.
- * Por eso el aviso al abrir la app sigue siendo la red de seguridad.
- */
+import { useState, useEffect } from 'react'
+import { estadoAvisos, activarAvisos, desactivarAvisos, probarAviso } from '../lib/push'
 
-export const permisoAvisos = () =>
-  typeof Notification === 'undefined' ? 'no-soportado' : Notification.permission
+/* ---------------------------------------------------------------------
+   Tarjeta de avisos · va en src/components/Avisos.jsx
 
-export async function pedirPermiso() {
-  if (typeof Notification === 'undefined') return 'no-soportado'
-  if (Notification.permission === 'granted') return 'granted'
-  return await Notification.requestPermission()
+   Dice exactamente qué falta en vez de un botón que no hace nada: en
+   iPhone lo más común es que la app no esté instalada, y sin eso iOS
+   no permite avisos por mucho que se toque el botón.
+   --------------------------------------------------------------------- */
+
+const TEXTOS = {
+  'sin-instalar': 'Para recibir avisos, instala la app: en Safari toca Compartir → Añadir a pantalla de inicio, y ábrela desde ese icono.',
+  'sin-soporte': 'Este navegador no admite avisos.',
+  'sin-llave': 'Falta configurar la llave de avisos (VITE_VAPID_PUBLIC_KEY) en Vercel.',
+  'bloqueado': 'Los avisos están bloqueados. Actívalos en Ajustes del teléfono → KAL → Notificaciones.',
+  'inactivo': 'Te aviso 10 minutos antes de que empiecen tus partidos, agrupados por hora, y cada noche a las 8 te mando los de mañana.',
+  'activo': 'Activos en este teléfono. Te aviso 10 minutos antes de tus partidos y cada noche a las 8 con los de mañana.'
 }
 
-const programados = new Map()
+export default function Avisos({ toast }) {
+  const [estado, setEstado] = useState('cargando')
+  const [ocupado, setOcupado] = useState(false)
 
-/** Programa un aviso para una hora concreta del día. */
-export function programar(id, texto, fechaISO, hora) {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-  if (!fechaISO || !hora) return
+  const refrescar = () => estadoAvisos().then(setEstado).catch(() => setEstado('sin-soporte'))
+  useEffect(() => { refrescar() }, [])
 
-  const [h, m] = String(hora).split(':').map(Number)
-  if (Number.isNaN(h)) return
+  const [problema, setProblema] = useState('')
 
-  const cuando = new Date(`${fechaISO}T00:00:00`)
-  cuando.setHours(h, m || 0, 0, 0)
+  async function hacer(fn, ok) {
+    setOcupado(true)
+    setProblema('')
+    try { const r = await fn(); if (ok) toast(typeof ok === 'function' ? ok(r) : ok) }
+    catch (e) { setProblema(e.message) }
+    finally { setOcupado(false); refrescar() }
+  }
 
-  const espera = cuando.getTime() - Date.now()
-  if (espera <= 0 || espera > 12 * 60 * 60 * 1000) return   // ni pasado ni más de 12h
+  if (estado === 'cargando') return null
 
-  cancelar(id)
-  const t = setTimeout(() => {
-    try {
-      new Notification('Empieza el partido', { body: texto, tag: id })
-    } catch { /* el navegador puede bloquearlo */ }
-    programados.delete(id)
-  }, espera)
-  programados.set(id, t)
+  return (
+    <div className={`card avisos ${estado === 'activo' ? 'on' : ''}`}>
+      <span className="eyebrow">Avisos al teléfono</span>
+      <p className="avisos-txt">{TEXTOS[estado]}</p>
+
+      {/* El motivo se queda escrito: un aviso emergente se va antes de leerlo. */}
+      {problema && <div className="flag" style={{ margin: '0 0 12px' }}>{problema}</div>}
+
+      {estado === 'inactivo' && (
+        <button className="act" disabled={ocupado}
+                onClick={() => hacer(activarAvisos, 'Avisos activados')}>
+          {ocupado ? 'Activando…' : 'Activar avisos'}
+        </button>
+      )}
+
+      {estado === 'activo' && (
+        <div className="row c2">
+          <button className="act" disabled={ocupado}
+                  onClick={() => hacer(probarAviso, 'Aviso de prueba enviado · revisa tu pantalla')}>
+            Mandar prueba
+          </button>
+          <button className="ghost" disabled={ocupado}
+                  onClick={() => hacer(desactivarAvisos, 'Avisos desactivados en este teléfono')}>
+            Desactivar
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
-
-export function cancelar(id) {
-  const t = programados.get(id)
-  if (t) { clearTimeout(t); programados.delete(id) }
-}
-
-export const cuantosProgramados = () => programados.size
