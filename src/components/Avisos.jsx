@@ -25,10 +25,13 @@ export default function Avisos({ toast }) {
   const refrescar = () => estadoAvisos().then(setEstado).catch(() => setEstado('sin-soporte'))
   useEffect(() => { refrescar() }, [])
 
+  const [problema, setProblema] = useState('')
+
   async function hacer(fn, ok) {
     setOcupado(true)
+    setProblema('')
     try { const r = await fn(); if (ok) toast(typeof ok === 'function' ? ok(r) : ok) }
-    catch (e) { toast(e.message) }
+    catch (e) { setProblema(e.message) }
     finally { setOcupado(false); refrescar() }
   }
 
@@ -38,6 +41,9 @@ export default function Avisos({ toast }) {
     <div className={`card avisos ${estado === 'activo' ? 'on' : ''}`}>
       <span className="eyebrow">Avisos al teléfono</span>
       <p className="avisos-txt">{TEXTOS[estado]}</p>
+
+      {/* El motivo se queda escrito: un aviso emergente se va antes de leerlo. */}
+      {problema && <div className="flag" style={{ margin: '0 0 12px' }}>{problema}</div>}
 
       {estado === 'inactivo' && (
         <button className="act" disabled={ocupado}
@@ -49,8 +55,7 @@ export default function Avisos({ toast }) {
       {estado === 'activo' && (
         <div className="row c2">
           <button className="act" disabled={ocupado}
-                  onClick={() => hacer(probarAviso,
-                    n => n ? 'Aviso de prueba enviado' : 'No llegó: revisa la configuración de la función')}>
+                  onClick={() => hacer(probarAviso, 'Aviso de prueba enviado · revisa tu pantalla')}>
             Mandar prueba
           </button>
           <button className="ghost" disabled={ocupado}
