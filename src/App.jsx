@@ -6,6 +6,7 @@ import Resumen from './components/Resumen'
 import NuevaApuesta from './components/NuevaApuesta'
 import Historial from './components/Historial'
 import Cola from './components/Cola'
+import Carta from './components/Carta'
 import Sombra from './components/Sombra'
 import Analisis from './components/Analisis'
 import Casas from './components/Casas'
@@ -116,8 +117,14 @@ export default function App() {
                           onClick={() => { setVistaModelo('sombra'); window.scrollTo(0, 0) }}>
                     Sombra
                   </button>
+                  <button className={vistaModelo === 'carta' ? 'on' : ''}
+                          onClick={() => { setVistaModelo('carta'); window.scrollTo(0, 0) }}>
+                    Carta
+                  </button>
                 </div>
-                {vistaModelo === 'cola' ? <Cola toast={toast} /> : <Sombra toast={toast} />}
+                {vistaModelo === 'cola' ? <Cola toast={toast} />
+                  : vistaModelo === 'carta' ? <Carta toast={toast} />
+                    : <Sombra toast={toast} />}
               </>
             )}
 
