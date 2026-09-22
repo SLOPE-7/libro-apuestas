@@ -147,7 +147,8 @@ function distintivo(ctx, x, y, radio, nombre, imagen) {
      local, visitante, fecha, hora, competicion, pais,
      analisis, picks: [{ mercado, detalle, probabilidad, cuota }],
      formato: 'decimal' | 'americano' | 'fraccional',
-     escudoLocal, escudoVisitante   (Image ya cargada, o null)
+     escudoLocal, escudoVisitante,        (Image ya cargada, o null)
+     escudoLiga, escudoPais               (Image ya cargada, o null — NUEVO)
    }                                                                  */
 
 export function dibujarCarta(ctx, datos) {
@@ -226,8 +227,27 @@ export function dibujarCarta(ctx, datos) {
   ctx.fillText('VS', centro, y - 2)
   ctx.textAlign = 'left'
 
+  // ── logos de liga y país (NUEVO) ──
+  // Dos círculos pequeños, centrados, justo arriba del renglón de
+  // competición/fecha. Si no hay ninguno, no se reserva espacio.
+  y += 76
+  const iconos = [
+    d.escudoLiga ? { img: d.escudoLiga, etq: d.competicion } : null,
+    d.escudoPais ? { img: d.escudoPais, etq: d.pais } : null
+  ].filter(Boolean)
+  const rIcono = 26
+  if (iconos.length) {
+    const espacio = 14
+    const anchoTotal = iconos.length * rIcono * 2 + (iconos.length - 1) * espacio
+    let ix = centro - anchoTotal / 2 + rIcono
+    iconos.forEach(ic => {
+      distintivo(ctx, ix, y, rIcono, ic.etq, ic.img)
+      ix += rIcono * 2 + espacio
+    })
+    y += rIcono + 24
+  }
+
   // ── competición, fecha, sede ──
-  y += 62
   fuente(ctx, MONO, 26, 500)
   ctx.fillStyle = C.suave
   const meta = [
