@@ -1,16 +1,28 @@
 /* ---------------------------------------------------------------------
    CARTA PARA REDES · src/lib/carta.js
 
-   Dibuja la imagen de 1080×1920 (historia) sobre un canvas. El mismo
-   código corre en el teléfono y en cualquier sitio con un canvas, para
-   poder revisar el diseño sin desplegar.
+   Dibuja la imagen (1080px de ancho, alto variable) sobre un canvas. El
+   mismo código corre en el teléfono y en cualquier sitio con un canvas,
+   para poder revisar el diseño sin desplegar.
 
    No usa imágenes de fuera: todo lo que se pinta está aquí o lo subió
    el usuario como data URI. Si no, el teléfono se niega a exportar.
+
+   IMPORTANTE — alto dinámico: 1920px (formato historia) es el alto
+   MÍNIMO, no fijo. Si el análisis es largo o hay varios picks, la
+   carta pide más alto con `calcularAltoCarta()` ANTES de dibujar, así
+   el pie de página (el cuadro negro del final) nunca queda pegado
+   encima de un pick y lo tapa. Quien use esto debe:
+
+     const alto = calcularAltoCarta(ctx, datos)
+     canvas.height = alto        // esto reinicia el canvas
+     dibujarCarta(canvas.getContext('2d'), datos)
+
+   Ver Carta.jsx para el ejemplo completo.
    --------------------------------------------------------------------- */
 
 export const ANCHO = 1080
-export const ALTO = 1920
+export const ALTO = 1920           // alto mínimo (formato historia)
 
 const C = {
   papel: '#FBFAF7', papel2: '#F4F3EE',
@@ -22,6 +34,11 @@ const C = {
 const SANS = 'IBM Plex Sans Condensed'
 const SERIF = 'IBM Plex Serif'
 const MONO = 'IBM Plex Mono'
+
+const M = 72                       // margen lateral
+const PIE_ALTO = 300
+const PIE_MARGEN_INFERIOR = 56
+const PIE_MARGEN_SUPERIOR = 24     // aire mínimo entre el último pick y el pie
 
 /* ── cuotas ─────────────────────────────────────────────────────────
    Una misma cuota se escribe de tres formas según el país. Se calculan
@@ -71,7 +88,8 @@ const fuente = (ctx, familia, tam, peso = 400) => {
   ctx.font = `${peso} ${tam}px "${familia}"`
 }
 
-/** Parte un texto en líneas que caben en un ancho. */
+/** Parte un texto en líneas que caben en un ancho. Usa el font YA
+ *  puesto en el ctx — quien llame debe fijarlo antes con `fuente()`. */
 function lineas(ctx, texto, ancho) {
   const out = []
   for (const parrafo of String(texto || '').split('\n')) {
@@ -87,8 +105,7 @@ function lineas(ctx, texto, ancho) {
 }
 
 /** Escribe un texto ya partido y devuelve la altura usada. */
-function parrafo(ctx, texto, x, y, ancho, alto) {
-  const ls = lineas(ctx, texto, ancho)
+function escribirParrafo(ctx, ls, x, y, alto) {
   ls.forEach((l, i) => ctx.fillText(l, x, y + i * alto))
   return ls.length * alto
 }
@@ -110,7 +127,6 @@ function iniciales(nombre) {
   const ruido = /^(fc|cf|sc|ac|as|ss|cd|ud|sd|afc|cfc|club|deportivo|real|atletico|atlético|the|de|del|la|el)$/i
   const ps = String(nombre || '').split(/\s+/).filter(p => p && !ruido.test(p) && !/^[ivxlcdm]+$/i.test(p) && !/^\d+$/.test(p))
   const base = ps.length ? ps : String(nombre || '?').split(/\s+/)
-  // una sola palabra da tres letras (BAR, MAD); varias, una por palabra
   const txt = base.length === 1
     ? base[0].slice(0, 3)
     : base.slice(0, 3).map(p => p[0]).join('')
@@ -142,6 +158,78 @@ function distintivo(ctx, x, y, radio, nombre, imagen) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
 }
 
+/* ── layout ─────────────────────────────────────────────────────────
+   Calcula, SIN dibujar nada, todo lo que depende del contenido: en
+   cuántas líneas cabe el análisis, cuántas líneas necesita el nombre
+   de cada mercado y qué alto ocupa cada fila de pick, y en qué "y"
+   terminaría el bloque de picks. Tanto `calcularAltoCarta()` como
+   `dibujarCarta()` llaman a esto, así que SIEMPRE calculan lo mismo —
+   no hay manera de que el alto que se reservó y lo que realmente se
+   dibuja queden desincronizados. */
+function construirLayout(ctx, datos) {
+  const d = datos || {}
+  const picks = d.picks || []
+  const ancho = ANCHO - M * 2
+
+  let y = 132
+  y += 116   // cabecera
+  y += 108   // fila de equipos
+  y += 76    // antes de logos de liga/país
+
+  const iconos = [
+    d.escudoLiga ? { img: d.escudoLiga, etq: d.competicion } : null,
+    d.escudoPais ? { img: d.escudoPais, etq: d.pais } : null
+  ].filter(Boolean)
+  const rIcono = 26
+  if (iconos.length) y += rIcono * 2 + 24
+
+  const meta = [
+    [d.competicion, d.pais].filter(Boolean).join(' · '),
+    [d.fecha, d.hora].filter(Boolean).join('  ')
+  ].filter(Boolean)
+  y += meta.length * 38 + 26
+
+  y += 64   // antes de la etiqueta ANÁLISIS
+  y += 48   // después de la etiqueta
+
+  fuente(ctx, SANS, 30, 400)
+  const analisisLineas = lineas(ctx, d.analisis, ancho)
+  y += analisisLineas.length * 42
+
+  y += 54 + 30 + 44   // etiqueta "N PICKS POSIBLES" + cabecera de columnas
+
+  const anchoMercado = ANCHO - M - 300 - (M + 96)
+  const MAX_LINEAS_MERCADO = 2
+  const ALTO_LINEA_MERCADO = 38
+  const ALTO_LINEA_DETALLE = 28
+
+  const filas = picks.map(p => {
+    fuente(ctx, SANS, 34, 700)
+    const lineasMercado = lineas(ctx, p.mercado, anchoMercado).slice(0, MAX_LINEAS_MERCADO)
+    let lineaDetalle = null
+    if (p.detalle) {
+      fuente(ctx, SANS, 25, 400)
+      lineaDetalle = lineas(ctx, p.detalle, anchoMercado)[0]
+    }
+    const alto = Math.max(76, 36 + lineasMercado.length * ALTO_LINEA_MERCADO + (lineaDetalle ? ALTO_LINEA_DETALLE : 0))
+    return { p, lineasMercado, lineaDetalle, alto }
+  })
+
+  y += filas.reduce((s, f) => s + f.alto, 0)
+
+  return { yFinal: y, meta, analisisLineas, filas, iconos, rIcono, ancho, anchoMercado }
+}
+
+/** Cuánto alto necesita esta carta en concreto. Nunca menos que el
+ *  mínimo de formato historia (1920px); crece si el análisis o los
+ *  picks no caben ahí sin que el pie de página los tape. Llamar a
+ *  esto y poner canvas.height = resultado ANTES de dibujarCarta(). */
+export function calcularAltoCarta(ctx, datos) {
+  const layout = construirLayout(ctx, datos)
+  const necesario = Math.ceil(layout.yFinal + PIE_MARGEN_SUPERIOR + PIE_ALTO + PIE_MARGEN_INFERIOR)
+  return Math.max(ALTO, necesario)
+}
+
 /* ── la carta ───────────────────────────────────────────────────────
    datos = {
      local, visitante, fecha, hora, competicion, pais,
@@ -151,26 +239,25 @@ function distintivo(ctx, x, y, radio, nombre, imagen) {
      escudoLiga, escudoPais               (Image ya cargada, o null)
    }
 
-   NOTA: `picks` no se recorta a una cantidad fija: se dibujan todos.
-   El análisis tampoco se recorta: `parrafo()` lo envuelve en tantas
-   líneas como haga falta y todo lo que viene después se corre hacia
-   abajo. Cada fila de picks también mide su propio nombre de mercado
-   y crece a dos líneas si no cabe en una, así un nombre largo como
-   "Más de 2.5 paradas del portero de Dinamarca" nunca se corta.       */
-
+   Dibuja sobre ctx.canvas tal cual esté de alto en este momento — por
+   eso hay que llamar primero a calcularAltoCarta() y fijar
+   canvas.height con el resultado. El pie de página se ancla siempre
+   al fondo REAL del canvas (ctx.canvas.height), nunca a un número
+   fijo, así que si el canvas se hizo más alto para que quepa todo,
+   el pie baja con él en vez de quedar flotando a la mitad. */
 export function dibujarCarta(ctx, datos) {
   const d = datos || {}
-  const picks = d.picks || []
-  const M = 72                       // margen lateral
-  const ancho = ANCHO - M * 2
+  const altoCanvas = ctx.canvas.height
+  const layout = construirLayout(ctx, datos)
+  const { meta, analisisLineas, filas, iconos, rIcono, ancho, anchoMercado } = layout
 
   ctx.fillStyle = C.papel
-  ctx.fillRect(0, 0, ANCHO, ALTO)
+  ctx.fillRect(0, 0, ANCHO, altoCanvas)
 
   // renglones tenues, como el papel de la app
   ctx.strokeStyle = '#EFEDE4'; ctx.lineWidth = 2
-  for (let y = 150; y < ALTO; y += 44) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ANCHO, y); ctx.stroke()
+  for (let ly = 150; ly < altoCanvas; ly += 44) {
+    ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(ANCHO, ly); ctx.stroke()
   }
 
   let y = 132
@@ -184,7 +271,6 @@ export function dibujarCarta(ctx, datos) {
   ctx.fillStyle = C.tinta2
   ctx.fillText('Analysis', M + anchoKal + 22, y)
 
-  // subrayado a mano
   ctx.strokeStyle = C.ambarSuave; ctx.lineWidth = 16; ctx.lineCap = 'round'
   ctx.beginPath(); ctx.moveTo(M + 6, y + 22); ctx.lineTo(M + anchoKal + 6, y + 22); ctx.stroke()
   ctx.lineCap = 'butt'
@@ -211,7 +297,6 @@ export function dibujarCarta(ctx, datos) {
   distintivo(ctx, ANCHO - M - R, y - 18, R, d.visitante, d.escudoVisitante)
 
   const centro = ANCHO / 2
-  // cada nombre en su columna, sin invadir el VS del medio
   const huecoVS = 58
   const colIzq = [M + R * 2 + 26, centro - huecoVS]
   const colDer = [centro + huecoVS, ANCHO - M - R * 2 - 26]
@@ -236,11 +321,6 @@ export function dibujarCarta(ctx, datos) {
 
   // ── logos de liga y país ──
   y += 76
-  const iconos = [
-    d.escudoLiga ? { img: d.escudoLiga, etq: d.competicion } : null,
-    d.escudoPais ? { img: d.escudoPais, etq: d.pais } : null
-  ].filter(Boolean)
-  const rIcono = 26
   if (iconos.length) {
     const espacio = 14
     const anchoTotal = iconos.length * rIcono * 2 + (iconos.length - 1) * espacio
@@ -255,10 +335,6 @@ export function dibujarCarta(ctx, datos) {
   // ── competición, fecha, sede ──
   fuente(ctx, MONO, 26, 500)
   ctx.fillStyle = C.suave
-  const meta = [
-    [d.competicion, d.pais].filter(Boolean).join(' · '),
-    [d.fecha, d.hora].filter(Boolean).join('  ')
-  ].filter(Boolean)
   ctx.textAlign = 'center'
   meta.forEach((t, i) => ctx.fillText(t, centro, y + i * 38))
   ctx.textAlign = 'left'
@@ -281,13 +357,13 @@ export function dibujarCarta(ctx, datos) {
   y += 48
   fuente(ctx, SANS, 30, 400)
   ctx.fillStyle = C.tinta2
-  y += parrafo(ctx, d.analisis, M, y, ancho, 42)
+  y += escribirParrafo(ctx, analisisLineas, M, y, 42)
 
   // ── picks: todos los que vengan, con nombre de mercado completo ──
   y += 54
   fuente(ctx, SANS, 34, 700)
   ctx.fillStyle = C.ambarSuave
-  const tp = `${picks.length} ${picks.length === 1 ? 'PICK POSIBLE' : 'PICKS POSIBLES'}`
+  const tp = `${filas.length} ${filas.length === 1 ? 'PICK POSIBLE' : 'PICKS POSIBLES'}`
   const anchoTp = ctx.measureText(tp).width
   ctx.fillRect(M - 8, y - 32, anchoTp + 24, 42)
   ctx.fillStyle = C.tinta
@@ -303,27 +379,7 @@ export function dibujarCarta(ctx, datos) {
   ctx.textAlign = 'left'
   y += 44
 
-  const anchoMercado = ANCHO - M - 300 - (M + 96)
-  const MAX_LINEAS_MERCADO = 2
   const ALTO_LINEA_MERCADO = 38
-  const ALTO_LINEA_DETALLE = 28
-
-  // Se mide primero cada fila completa (nombre del mercado envuelto a
-  // hasta 2 líneas, más el detalle) para saber cuánto alto necesita, y
-  // luego se apilan una tras otra. Así ningún mercado se corta a la
-  // mitad, como pasaba antes con "…paradas del portero de" sin el
-  // nombre del equipo.
-  const filas = picks.map(p => {
-    fuente(ctx, SANS, 34, 700)
-    const lineasMercado = lineas(ctx, p.mercado, anchoMercado).slice(0, MAX_LINEAS_MERCADO)
-    let lineaDetalle = null
-    if (p.detalle) {
-      fuente(ctx, SANS, 25, 400)
-      lineaDetalle = lineas(ctx, p.detalle, anchoMercado)[0]
-    }
-    const alto = Math.max(76, 36 + lineasMercado.length * ALTO_LINEA_MERCADO + (lineaDetalle ? ALTO_LINEA_DETALLE : 0))
-    return { p, lineasMercado, lineaDetalle, alto }
-  })
 
   filas.forEach(({ p, lineasMercado, lineaDetalle, alto }, i) => {
     const arriba = y
@@ -340,9 +396,7 @@ export function dibujarCarta(ctx, datos) {
     ctx.fillText(String(i + 1), M + 34, medio + 1)
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
 
-    // bloque de texto (una o dos líneas de mercado + detalle) centrado
-    // verticalmente dentro de la fila
-    const bloqueAlto = lineasMercado.length * ALTO_LINEA_MERCADO + (lineaDetalle ? ALTO_LINEA_DETALLE : 0)
+    const bloqueAlto = lineasMercado.length * ALTO_LINEA_MERCADO + (lineaDetalle ? 28 : 0)
     let ty = medio - bloqueAlto / 2 + ALTO_LINEA_MERCADO * 0.72
     fuente(ctx, SANS, 34, 700)
     ctx.fillStyle = C.tinta
@@ -369,19 +423,20 @@ export function dibujarCarta(ctx, datos) {
   ctx.strokeStyle = C.linea; ctx.lineWidth = 2
   ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(ANCHO - M, y); ctx.stroke()
 
-  // ── pie: advertencia y frases ──
-  const pieAlto = 300
-  const pieY = ALTO - pieAlto - 56
-  caja(ctx, M, pieY, ancho, pieAlto, 26, C.tinta)
+  // ── pie: advertencia y frases — SIEMPRE anclado al fondo real del
+  //    canvas, nunca a un ALTO fijo, para que jamás quede a la mitad
+  //    de un pick. ──
+  const pieY = altoCanvas - PIE_ALTO - PIE_MARGEN_INFERIOR
+  caja(ctx, M, pieY, ancho, PIE_ALTO, 26, C.tinta)
 
   fuente(ctx, SANS, 24, 400)
   ctx.fillStyle = '#B9C0C4'
   ctx.textAlign = 'center'
   const aviso = 'Análisis generado con inteligencia artificial a partir de estadísticas reales. No es una predicción: en el fútbol todo puede pasar. Apuesta solo lo que puedas perder.'
-  const ls = lineas(ctx, aviso, ancho - 80)
-  ls.forEach((l, i) => ctx.fillText(l, centro, pieY + 52 + i * 32))
+  const lsAviso = lineas(ctx, aviso, ancho - 80)
+  lsAviso.forEach((l, i) => ctx.fillText(l, centro, pieY + 52 + i * 32))
 
-  let py = pieY + 62 + ls.length * 32
+  let py = pieY + 62 + lsAviso.length * 32
   fuente(ctx, SERIF, 30, 700)
   ctx.fillStyle = C.papel
   ctx.fillText('"La mejor apuesta también puede ser no apostar."', centro, py)
