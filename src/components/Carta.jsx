@@ -11,10 +11,14 @@ import { dibujarCarta, ANCHO, ALTO, momios } from '../lib/carta'
    análisis guardado. Lo único que pones tú son las cuotas, porque esas
    las ves en tu casa de apuestas y cambian a cada rato.
 
-   Los escudos de equipo, y ahora también el logo de la liga y el de
-   país, se guardan en la misma tabla `escudos` (clave → imagen). La
-   liga y el país se guardan con su propio nombre como clave, igual
-   que un equipo más.
+   El análisis y los picks van COMPLETOS: no se recorta el texto ni se
+   limita la cantidad de mercados. Si un partido trae muchos picks o un
+   análisis largo, la carta se ve más apretada, pero nunca se pierde
+   información entre Cola/Sombra y la Carta.
+
+   Los escudos de equipo, y el logo de la liga y de país, se guardan en
+   la misma tabla `escudos` (clave → imagen). La liga y el país se
+   guardan con su propio nombre como clave, igual que un equipo más.
    --------------------------------------------------------------------- */
 
 const norm = s => String(s || '').trim().toLowerCase()
@@ -80,24 +84,27 @@ export default function Carta({ toast }) {
     return () => { vivo = false }
   }, [escudos])
 
-  /** Al elegir partido, se arma la propuesta: análisis y mercados con su
-   *  probabilidad. Todo editable: la carta es tuya, no del modelo. */
+  /** Al elegir partido, se arma la propuesta: análisis completo (sin
+   *  recortar) y TODOS los mercados que trae el análisis, marcados por
+   *  defecto. La carta es tuya: puedes desmarcar lo que no quieras
+   *  publicar, pero de entrada no se pierde nada de lo que ya
+   *  analizaste. */
   function elegir(p) {
     setSel(p)
     const r = p.respuesta || {}
     const lb = r.linea_base || {}
-    setAnalisis([lb.goles, lb.corners, lb.tarjetas].filter(Boolean).join(' ').slice(0, 420))
+    setAnalisis([lb.goles, lb.corners, lb.tarjetas].filter(Boolean).join(' '))
 
     const cuotas = p.cuotas || {}
     const vistos = new Set()
     const lista = [...(r.picks_ia || []), ...(r.mercados || [])]
       .filter(m => m && m.mercado && !vistos.has(norm(m.mercado)) && vistos.add(norm(m.mercado)))
-      .map((m, i) => ({
+      .map(m => ({
         mercado: m.mercado,
         detalle: familiaDe(m.mercado) || '',
         probabilidad: Number(m.probabilidad) || null,
         cuota: cuotas[m.mercado] ? String(cuotas[m.mercado]) : '',
-        elegido: i < 6
+        elegido: true
       }))
     setPicks(lista)
   }
@@ -115,7 +122,7 @@ export default function Carta({ toast }) {
       hora: sel.hora || '',
       analisis,
       formato,
-      picks: elegidos.slice(0, 6).map(p => ({ ...p, cuota: Number(p.cuota) || null })),
+      picks: elegidos.map(p => ({ ...p, cuota: Number(p.cuota) || null })),
       escudoLocal: imgs[norm(sel.local)] || null,
       escudoVisitante: imgs[norm(sel.visitante)] || null,
       escudoLiga: sel.competicion ? (imgs[norm(sel.competicion)] || null) : null,
@@ -196,9 +203,9 @@ export default function Carta({ toast }) {
         <>
           <div className="field">
             <label htmlFor="c-analisis">Análisis (edítalo a tu gusto)</label>
-            <textarea id="c-analisis" rows={5} value={analisis}
-                      onChange={e => setAnalisis(e.target.value.slice(0, 480))} />
-            <p className="ayuda">{analisis.length}/480 · lo que no entre se recorta en la imagen.</p>
+            <textarea id="c-analisis" rows={7} value={analisis}
+                      onChange={e => setAnalisis(e.target.value)} />
+            <p className="ayuda">{analisis.length} caracteres · texto completo, sin recortar.</p>
           </div>
 
           <div className="field">
@@ -211,7 +218,10 @@ export default function Carta({ toast }) {
             </div>
           </div>
 
-          <h3 className="sub">Picks · marca hasta 6</h3>
+          <h3 className="sub">Picks · {elegidos.length} de {picks.length} marcados</h3>
+          <p className="ayuda" style={{ marginTop: -6 }}>
+            Salen todos los que trajo el análisis. Desmarca los que no quieras publicar.
+          </p>
           {picks.map((p, i) => {
             const m = momios(Number(p.cuota))
             return (
@@ -236,9 +246,6 @@ export default function Carta({ toast }) {
               </div>
             )
           })}
-          {elegidos.length > 6 && (
-            <p className="ayuda">Has marcado {elegidos.length}: solo salen los 6 primeros.</p>
-          )}
 
           <h3 className="sub">Escudos</h3>
           <p className="ayuda" style={{ marginTop: -6 }}>
