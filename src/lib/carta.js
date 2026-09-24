@@ -151,15 +151,12 @@ function distintivo(ctx, x, y, radio, nombre, imagen) {
      escudoLiga, escudoPais               (Image ya cargada, o null)
    }
 
-   NOTA: `picks` ya NO se recorta a 6 aquí. Se dibujan todos los que
-   vengan en el arreglo. El análisis tampoco se recorta: `parrafo()`
-   lo envuelve en tantas líneas como haga falta y todo lo que viene
-   después se corre hacia abajo. Con muchos picks o mucho texto la
-   fila de cada pick se hace más angosta (ver `altoFila` más abajo)
-   para que todo siga cabiendo en los 1920px de alto; pasado cierto
-   punto se ve apretado, así que si sueles tener 8+ picks o análisis
-   muy largos, avísame y le pongo un límite razonable con aviso en
-   pantalla en vez de dejarlo comprimirse solo.                      */
+   NOTA: `picks` no se recorta a una cantidad fija: se dibujan todos.
+   El análisis tampoco se recorta: `parrafo()` lo envuelve en tantas
+   líneas como haga falta y todo lo que viene después se corre hacia
+   abajo. Cada fila de picks también mide su propio nombre de mercado
+   y crece a dos líneas si no cabe en una, así un nombre largo como
+   "Más de 2.5 paradas del portero de Dinamarca" nunca se corta.       */
 
 export function dibujarCarta(ctx, datos) {
   const d = datos || {}
@@ -286,7 +283,7 @@ export function dibujarCarta(ctx, datos) {
   ctx.fillStyle = C.tinta2
   y += parrafo(ctx, d.analisis, M, y, ancho, 42)
 
-  // ── picks: todos los que vengan ──
+  // ── picks: todos los que vengan, con nombre de mercado completo ──
   y += 54
   fuente(ctx, SANS, 34, 700)
   ctx.fillStyle = C.ambarSuave
@@ -306,17 +303,34 @@ export function dibujarCarta(ctx, datos) {
   ctx.textAlign = 'left'
   y += 44
 
-  // El alto de fila se reparte entre el espacio que quede antes del
-  // pie de página (1560px de referencia); con muchos picks las filas
-  // se angostan hasta un mínimo de 76px antes de empezar a apretarse
-  // demasiado.
-  const altoFila = Math.min(126, Math.max(76, (1560 - y) / Math.max(picks.length, 1)))
-  picks.forEach((p, i) => {
-    const arriba = y + i * altoFila
+  const anchoMercado = ANCHO - M - 300 - (M + 96)
+  const MAX_LINEAS_MERCADO = 2
+  const ALTO_LINEA_MERCADO = 38
+  const ALTO_LINEA_DETALLE = 28
+
+  // Se mide primero cada fila completa (nombre del mercado envuelto a
+  // hasta 2 líneas, más el detalle) para saber cuánto alto necesita, y
+  // luego se apilan una tras otra. Así ningún mercado se corta a la
+  // mitad, como pasaba antes con "…paradas del portero de" sin el
+  // nombre del equipo.
+  const filas = picks.map(p => {
+    fuente(ctx, SANS, 34, 700)
+    const lineasMercado = lineas(ctx, p.mercado, anchoMercado).slice(0, MAX_LINEAS_MERCADO)
+    let lineaDetalle = null
+    if (p.detalle) {
+      fuente(ctx, SANS, 25, 400)
+      lineaDetalle = lineas(ctx, p.detalle, anchoMercado)[0]
+    }
+    const alto = Math.max(76, 36 + lineasMercado.length * ALTO_LINEA_MERCADO + (lineaDetalle ? ALTO_LINEA_DETALLE : 0))
+    return { p, lineasMercado, lineaDetalle, alto }
+  })
+
+  filas.forEach(({ p, lineasMercado, lineaDetalle, alto }, i) => {
+    const arriba = y
     ctx.strokeStyle = C.linea; ctx.lineWidth = 2
     ctx.beginPath(); ctx.moveTo(M, arriba); ctx.lineTo(ANCHO - M, arriba); ctx.stroke()
 
-    const medio = arriba + altoFila / 2
+    const medio = arriba + alto / 2
 
     ctx.beginPath(); ctx.arc(M + 34, medio, 28, 0, Math.PI * 2)
     ctx.fillStyle = C.tinta; ctx.fill()
@@ -326,15 +340,17 @@ export function dibujarCarta(ctx, datos) {
     ctx.fillText(String(i + 1), M + 34, medio + 1)
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
 
+    // bloque de texto (una o dos líneas de mercado + detalle) centrado
+    // verticalmente dentro de la fila
+    const bloqueAlto = lineasMercado.length * ALTO_LINEA_MERCADO + (lineaDetalle ? ALTO_LINEA_DETALLE : 0)
+    let ty = medio - bloqueAlto / 2 + ALTO_LINEA_MERCADO * 0.72
     fuente(ctx, SANS, 34, 700)
     ctx.fillStyle = C.tinta
-    const anchoMercado = ANCHO - M - 300 - (M + 96)
-    const nombre = lineas(ctx, p.mercado, anchoMercado)[0]
-    ctx.fillText(nombre, M + 96, medio + (p.detalle ? -4 : 12))
-    if (p.detalle) {
+    lineasMercado.forEach(l => { ctx.fillText(l, M + 96, ty); ty += ALTO_LINEA_MERCADO })
+    if (lineaDetalle) {
       fuente(ctx, SANS, 25, 400)
       ctx.fillStyle = C.suave
-      ctx.fillText(lineas(ctx, p.detalle, anchoMercado)[0], M + 96, medio + 30)
+      ctx.fillText(lineaDetalle, M + 96, ty - 4)
     }
 
     ctx.textAlign = 'center'
@@ -347,8 +363,9 @@ export function dibujarCarta(ctx, datos) {
     ctx.fillStyle = C.tinta
     ctx.fillText(cuotaTexto(p.cuota, d.formato), ANCHO - M - 82, medio + 14)
     ctx.textAlign = 'left'
+
+    y += alto
   })
-  y += picks.length * altoFila
   ctx.strokeStyle = C.linea; ctx.lineWidth = 2
   ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(ANCHO - M, y); ctx.stroke()
 
