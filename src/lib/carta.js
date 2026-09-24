@@ -148,12 +148,22 @@ function distintivo(ctx, x, y, radio, nombre, imagen) {
      analisis, picks: [{ mercado, detalle, probabilidad, cuota }],
      formato: 'decimal' | 'americano' | 'fraccional',
      escudoLocal, escudoVisitante,        (Image ya cargada, o null)
-     escudoLiga, escudoPais               (Image ya cargada, o null — NUEVO)
-   }                                                                  */
+     escudoLiga, escudoPais               (Image ya cargada, o null)
+   }
+
+   NOTA: `picks` ya NO se recorta a 6 aquí. Se dibujan todos los que
+   vengan en el arreglo. El análisis tampoco se recorta: `parrafo()`
+   lo envuelve en tantas líneas como haga falta y todo lo que viene
+   después se corre hacia abajo. Con muchos picks o mucho texto la
+   fila de cada pick se hace más angosta (ver `altoFila` más abajo)
+   para que todo siga cabiendo en los 1920px de alto; pasado cierto
+   punto se ve apretado, así que si sueles tener 8+ picks o análisis
+   muy largos, avísame y le pongo un límite razonable con aviso en
+   pantalla en vez de dejarlo comprimirse solo.                      */
 
 export function dibujarCarta(ctx, datos) {
   const d = datos || {}
-  const picks = (d.picks || []).slice(0, 6)
+  const picks = d.picks || []
   const M = 72                       // margen lateral
   const ancho = ANCHO - M * 2
 
@@ -227,9 +237,7 @@ export function dibujarCarta(ctx, datos) {
   ctx.fillText('VS', centro, y - 2)
   ctx.textAlign = 'left'
 
-  // ── logos de liga y país (NUEVO) ──
-  // Dos círculos pequeños, centrados, justo arriba del renglón de
-  // competición/fecha. Si no hay ninguno, no se reserva espacio.
+  // ── logos de liga y país ──
   y += 76
   const iconos = [
     d.escudoLiga ? { img: d.escudoLiga, etq: d.competicion } : null,
@@ -262,7 +270,7 @@ export function dibujarCarta(ctx, datos) {
   ctx.strokeStyle = C.linea; ctx.lineWidth = 2
   ctx.beginPath(); ctx.moveTo(M, y); ctx.lineTo(ANCHO - M, y); ctx.stroke()
 
-  // ── análisis ──
+  // ── análisis: texto completo, sin recortar ──
   y += 64
   fuente(ctx, SANS, 34, 700)
   ctx.fillStyle = C.tinta
@@ -278,7 +286,7 @@ export function dibujarCarta(ctx, datos) {
   ctx.fillStyle = C.tinta2
   y += parrafo(ctx, d.analisis, M, y, ancho, 42)
 
-  // ── picks ──
+  // ── picks: todos los que vengan ──
   y += 54
   fuente(ctx, SANS, 34, 700)
   ctx.fillStyle = C.ambarSuave
@@ -298,7 +306,11 @@ export function dibujarCarta(ctx, datos) {
   ctx.textAlign = 'left'
   y += 44
 
-  const altoFila = Math.min(126, Math.max(92, (1560 - y) / Math.max(picks.length, 1)))
+  // El alto de fila se reparte entre el espacio que quede antes del
+  // pie de página (1560px de referencia); con muchos picks las filas
+  // se angostan hasta un mínimo de 76px antes de empezar a apretarse
+  // demasiado.
+  const altoFila = Math.min(126, Math.max(76, (1560 - y) / Math.max(picks.length, 1)))
   picks.forEach((p, i) => {
     const arriba = y + i * altoFila
     ctx.strokeStyle = C.linea; ctx.lineWidth = 2
