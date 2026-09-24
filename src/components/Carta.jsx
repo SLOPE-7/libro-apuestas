@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { familiaDe } from '../lib/mercados'
-import { dibujarCarta, ANCHO, ALTO, momios } from '../lib/carta'
+import { dibujarCarta, calcularAltoCarta, ANCHO, ALTO, momios } from '../lib/carta'
 
 /* ---------------------------------------------------------------------
    CARTA PARA REDES · src/components/Carta.jsx
@@ -12,9 +12,10 @@ import { dibujarCarta, ANCHO, ALTO, momios } from '../lib/carta'
    las ves en tu casa de apuestas y cambian a cada rato.
 
    El análisis y los picks van COMPLETOS: no se recorta el texto ni se
-   limita la cantidad de mercados. Si un partido trae muchos picks o un
-   análisis largo, la carta se ve más apretada, pero nunca se pierde
-   información entre Cola/Sombra y la Carta.
+   limita la cantidad de mercados. Antes de dibujar, se calcula cuánto
+   alto necesita ESTA carta en concreto (calcularAltoCarta) y el canvas
+   se redimensiona a eso — así el pie de página nunca termina tapando
+   un pick cuando el análisis es largo o hay varios mercados.
 
    Los escudos de equipo, y el logo de la liga y de país, se guardan en
    la misma tabla `escudos` (clave → imagen). La liga y el país se
@@ -111,11 +112,9 @@ export default function Carta({ toast }) {
 
   const elegidos = picks.filter(p => p.elegido)
 
-  const pintar = useCallback(async () => {
-    const c = lienzo.current
-    if (!c || !sel) return
-    if (document.fonts?.ready) await document.fonts.ready
-    dibujarCarta(c.getContext('2d'), {
+  /** Arma los datos de la carta a partir del estado actual. */
+  function datosCarta() {
+    return {
       local: sel.local, visitante: sel.visitante,
       competicion: sel.competicion, pais: sel.pais,
       fecha: sel.fecha_partido ? sel.fecha_partido.split('-').reverse().join('/') : '',
@@ -127,7 +126,24 @@ export default function Carta({ toast }) {
       escudoVisitante: imgs[norm(sel.visitante)] || null,
       escudoLiga: sel.competicion ? (imgs[norm(sel.competicion)] || null) : null,
       escudoPais: sel.pais ? (imgs[norm(sel.pais)] || null) : null
-    })
+    }
+  }
+
+  const pintar = useCallback(async () => {
+    const c = lienzo.current
+    if (!c || !sel) return
+    if (document.fonts?.ready) await document.fonts.ready
+
+    const datos = datosCarta()
+    // Se mide primero cuánto alto necesita ESTA carta (análisis largo,
+    // varios picks) y se redimensiona el canvas antes de dibujar. Fijar
+    // c.height reinicia el canvas, así que se hace ANTES de pintar,
+    // nunca después.
+    const ctxMedida = c.getContext('2d')
+    const altoNecesario = calcularAltoCarta(ctxMedida, datos)
+    if (c.height !== altoNecesario) c.height = altoNecesario
+
+    dibujarCarta(c.getContext('2d'), datos)
   }, [sel, analisis, picks, formato, imgs])
 
   useEffect(() => { pintar() }, [pintar])
