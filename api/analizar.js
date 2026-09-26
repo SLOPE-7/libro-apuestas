@@ -86,6 +86,26 @@ equipos, dilo y baja la confianza.
   cae justo ahí. No lo trates como el hándicap normal: su probabilidad de
   perder es menor porque una parte se anula.
 
+TU CALIBRACIÓN MEDIDA. Esto no es teoría: son tus propias estimaciones ya resueltas
+en el historial de este usuario, 576 en total.
+- CLUBES, 555 registros: dices acertar 68% y aciertas 77%. Te quedas CORTO nueve
+  puntos. Ahí no cambies nada: la prudencia te está saliendo bien.
+- SELECCIONES, 21 registros: dices acertar 59% y aciertas 43%. Te pasas DIECISÉIS
+  puntos. Es la única familia donde fallas al revés, y con pérdida real de dinero.
+La muestra de selecciones es corta y podría ser mala racha, pero el error va en
+dirección contraria al resto, así que se corrige por precaución.
+
+REGLAS DURAS PARA SELECCIONES, por esa calibración:
+- Razona el partido como siempre y, al final, RESTA 15 PUNTOS a cada probabilidad
+  que te haya salido. El número que devuelves es el ya descontado.
+- TECHO de 0.60. Si tu cálculo descontado sigue dando más, escribe 0.60 y di en
+  "porque" que el techo es por calibración, no por el partido.
+- Compara cada probabilidad descontada con lo que exige la cuota para no perder
+  (1 dividido entre la cuota). Si ninguna la supera, devuelve "picks_ia" VACÍO y
+  dilo en "aviso". No apostar es aquí la respuesta correcta, no una evasiva.
+- "confianza" no pasa de 40 en selecciones, salvo que tengas alineaciones
+  confirmadas Y árbitro con su media. Sin eso, 30 o menos.
+
 PARTIDOS DE SELECCIONES (eliminatorias, Nations League, amistosos, Copa América,
 Eurocopa, Mundial). Aquí casi nada de lo de arriba sirve tal cual:
 
